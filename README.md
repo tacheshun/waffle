@@ -201,10 +201,6 @@ Check out the [examples](examples/) directory for complete working examples of W
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE.md file for details.
-
 ## Development
 
 ### Prerequisites
@@ -271,25 +267,6 @@ To create a new release:
    make release
    ```
 
-### CI/CD Pipeline
+## License
 
-This project uses GitHub Actions for continuous integration and delivery:
-
-- **Linting**: Ensures code quality using golangci-lint
-- **Testing**: Runs all tests with race detection on multiple Go versions
-- **Building**: Compiles the code and produces executable artifacts for multiple platforms
-- **Coverage**: Generates and uploads test coverage reports
-- **Releasing**: Automatically creates GitHub releases when tags are pushed
-
-The pipeline runs automatically on pushes to the main branch and on pull requests.
-
-### Development Workflow
-
-1. Create a feature branch from `main`
-2. Make your changes
-3. Ensure tests pass and linting is clean (`make all`)
-4. Submit a pull request
-5. Wait for CI checks to pass
-6. Request code review
-7. Merge to `main` once approved
-
+This project is licensed under the MIT License - see the LICENSE.md file for details.
