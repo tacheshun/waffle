@@ -7,8 +7,6 @@ toolchain go1.23.5
 require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/labstack/echo/v4 v4.13.3
-	github.com/redis/go-redis/v9 v9.4.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -41,4 +39,5 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
