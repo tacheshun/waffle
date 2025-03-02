@@ -3,6 +3,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/tacheshun/waffle)](https://goreportcard.com/report/github.com/tacheshun/waffle)
 [![GoDoc](https://godoc.org/github.com/tacheshun/waffle?status.svg)](https://godoc.org/github.com/tacheshun/waffle)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://github.com/tacheshun/waffle/workflows/Go/badge.svg)](https://github.com/tacheshun/waffle/actions)
 
 Waffle is a lightweight Web Application Firewall (WAF) written in Go, designed to protect your web applications from common attacks.
 
@@ -202,4 +203,92 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Development
+
+### Prerequisites
+
+- Go 1.21 or higher
+- Make (optional, for using the Makefile)
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/tacheshun/waffle.git
+
+# Navigate to the project directory
+cd waffle
+
+# Build using Make
+make build
+
+# Or build using Go directly
+go build -o build/waffle ./cmd/waffle
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Run tests with race detection
+make test-race
+
+# Generate test coverage report
+make coverage
+```
+
+### Code Quality
+
+```bash
+# Install development dependencies
+make setup
+
+# Run linter
+make lint
+```
+
+### Creating Releases
+
+To create a new release:
+
+1. Tag the repository with a semantic version:
+   ```bash
+   git tag -a v0.1.0 -m "First release"
+   git push origin v0.1.0
+   ```
+
+2. This will trigger the GitHub Actions release workflow, which:
+   - Builds binaries for multiple platforms (Linux, macOS, Windows)
+   - Creates a GitHub release with the binaries attached
+   - Generates release notes from commit messages
+
+3. Alternatively, you can build release binaries locally:
+   ```bash
+   make release
+   ```
+
+### CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration and delivery:
+
+- **Linting**: Ensures code quality using golangci-lint
+- **Testing**: Runs all tests with race detection on multiple Go versions
+- **Building**: Compiles the code and produces executable artifacts for multiple platforms
+- **Coverage**: Generates and uploads test coverage reports
+- **Releasing**: Automatically creates GitHub releases when tags are pushed
+
+The pipeline runs automatically on pushes to the main branch and on pull requests.
+
+### Development Workflow
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Ensure tests pass and linting is clean (`make all`)
+4. Submit a pull request
+5. Wait for CI checks to pass
+6. Request code review
+7. Merge to `main` once approved
 

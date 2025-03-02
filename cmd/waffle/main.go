@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/tacheshun/waffle/internal/version"
 	"github.com/tacheshun/waffle/pkg/waffle"
 )
 
@@ -17,7 +18,14 @@ func main() {
 	listenAddr := flag.String("listen", ":8080", "Address to listen on")
 	backendURL := flag.String("backend", "", "Backend server URL")
 	configFile := flag.String("config", "", "Path to configuration file")
+	showVersion := flag.Bool("version", false, "Show version information and exit")
 	flag.Parse()
+
+	// Show version and exit if requested
+	if *showVersion {
+		fmt.Println(version.BuildInfo())
+		os.Exit(0)
+	}
 
 	// Check if backend URL is provided
 	if *backendURL == "" {
@@ -49,8 +57,11 @@ func main() {
 	// Create handler with WAF middleware
 	handler := waf.Middleware(proxy)
 
+	// Print startup banner
+	fmt.Printf("Starting %s\n", version.BuildInfo())
+	fmt.Printf("Listening on %s, proxying to %s\n", *listenAddr, *backendURL)
+
 	// Start server
-	fmt.Printf("Starting Waffle WAF on %s, proxying to %s\n", *listenAddr, *backendURL)
 	err = http.ListenAndServe(*listenAddr, handler)
 	if err != nil {
 		log.Fatalf("Server error: %v", err)
