@@ -98,3 +98,26 @@ func min(a, b float64) float64 {
 	}
 	return b
 }
+
+// max returns the maximum of two float64 values
+func max(a, b float64) float64 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// refillTokens refills the token bucket based on the time passed
+func (b *bucket) refillTokens(rate float64, burst int) {
+	now := time.Now()
+	elapsed := now.Sub(b.lastUpdate).Seconds()
+
+	// Calculate the number of tokens to add
+	tokensToAdd := rate * elapsed
+
+	// Ensure we don't exceed the burst limit
+	b.tokens = min(float64(burst), b.tokens+tokensToAdd)
+
+	// Update the last update time
+	b.lastUpdate = now
+}
