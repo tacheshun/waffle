@@ -1,0 +1,504 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>waffle: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/tacheshun/waffle/pkg/waffle/middleware.go (80.0%)</option>
+				
+				<option value="file1">github.com/tacheshun/waffle/pkg/waffle/options.go (100.0%)</option>
+				
+				<option value="file2">github.com/tacheshun/waffle/pkg/waffle/waffle.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package waffle
+
+import (
+        "net/http"
+        "time"
+
+        "github.com/gin-gonic/gin"
+        "github.com/labstack/echo/v4"
+)
+
+// Middleware returns a standard net/http middleware function
+func (w *Waffle) Middleware(next http.Handler) http.Handler <span class="cov8" title="1">{
+        return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) </span><span class="cov8" title="1">{
+                // Process the request through the WAF
+                blocked, reason := w.Process(r)
+
+                if blocked </span><span class="cov8" title="1">{
+                        // Request is blocked
+                        if w.options.blockHandler != nil </span><span class="cov0" title="0">{
+                                // Use custom block handler if provided
+                                w.options.blockHandler(reason)
+                        }</span> else<span class="cov8" title="1"> {
+                                // Default block behavior
+                                rw.WriteHeader(http.StatusForbidden)
+                                rw.Write([]byte("Forbidden: " + reason.Message))
+
+                                // If rate limited, add retry-after header
+                                if reason.Rule == "rate_limit" &amp;&amp; reason.Wait &gt; 0 </span><span class="cov8" title="1">{
+                                        rw.Header().Set("Retry-After", time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+                                }</span>
+                        }
+                        <span class="cov8" title="1">return</span>
+                }
+
+                // Request is allowed, proceed to next handler
+                <span class="cov8" title="1">next.ServeHTTP(rw, r)</span>
+        })
+}
+
+// HandlerFunc returns a standard net/http middleware function for use with http.HandleFunc
+func (w *Waffle) HandlerFunc(next http.HandlerFunc) http.HandlerFunc <span class="cov8" title="1">{
+        return func(rw http.ResponseWriter, r *http.Request) </span><span class="cov8" title="1">{
+                // Process the request through the WAF
+                blocked, reason := w.Process(r)
+
+                if blocked </span><span class="cov8" title="1">{
+                        // Request is blocked
+                        if w.options.blockHandler != nil </span><span class="cov0" title="0">{
+                                // Use custom block handler if provided
+                                w.options.blockHandler(reason)
+                        }</span> else<span class="cov8" title="1"> {
+                                // Default block behavior
+                                rw.WriteHeader(http.StatusForbidden)
+                                rw.Write([]byte("Forbidden: " + reason.Message))
+
+                                // If rate limited, add retry-after header
+                                if reason.Rule == "rate_limit" &amp;&amp; reason.Wait &gt; 0 </span><span class="cov0" title="0">{
+                                        rw.Header().Set("Retry-After", time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+                                }</span>
+                        }
+                        <span class="cov8" title="1">return</span>
+                }
+
+                // Request is allowed, proceed to next handler
+                <span class="cov8" title="1">next(rw, r)</span>
+        }
+}
+
+// GinMiddleware returns a middleware function for use with the Gin framework
+func (w *Waffle) GinMiddleware() gin.HandlerFunc <span class="cov8" title="1">{
+        return func(c *gin.Context) </span><span class="cov8" title="1">{
+                // Process the request through the WAF
+                blocked, reason := w.Process(c.Request)
+
+                if blocked </span><span class="cov8" title="1">{
+                        // Request is blocked
+                        if w.options.blockHandler != nil </span><span class="cov0" title="0">{
+                                // Use custom block handler if provided
+                                w.options.blockHandler(reason)
+                                c.Abort()
+                        }</span> else<span class="cov8" title="1"> {
+                                // Default block behavior
+                                c.AbortWithStatus(http.StatusForbidden)
+                                c.String(http.StatusForbidden, "Forbidden: "+reason.Message)
+
+                                // If rate limited, add retry-after header
+                                if reason.Rule == "rate_limit" &amp;&amp; reason.Wait &gt; 0 </span><span class="cov0" title="0">{
+                                        c.Header("Retry-After", time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+                                }</span>
+                        }
+                        <span class="cov8" title="1">return</span>
+                }
+
+                // Request is allowed, proceed to next handler
+                <span class="cov8" title="1">c.Next()</span>
+        }
+}
+
+// EchoMiddleware returns a middleware function for use with the Echo framework
+func (w *Waffle) EchoMiddleware() echo.MiddlewareFunc <span class="cov8" title="1">{
+        return func(next echo.HandlerFunc) echo.HandlerFunc </span><span class="cov8" title="1">{
+                return func(c echo.Context) error </span><span class="cov8" title="1">{
+                        // Process the request through the WAF
+                        blocked, reason := w.Process(c.Request())
+
+                        if blocked </span><span class="cov8" title="1">{
+                                // Request is blocked
+                                if w.options.blockHandler != nil </span><span class="cov0" title="0">{
+                                        // Use custom block handler if provided
+                                        w.options.blockHandler(reason)
+                                        return nil
+                                }</span>
+
+                                // If rate limited, add retry-after header
+                                <span class="cov8" title="1">if reason.Rule == "rate_limit" &amp;&amp; reason.Wait &gt; 0 </span><span class="cov0" title="0">{
+                                        c.Response().Header().Set("Retry-After",
+                                                time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+                                }</span>
+
+                                <span class="cov8" title="1">return c.String(http.StatusForbidden, "Forbidden: "+reason.Message)</span>
+                        }
+
+                        // Request is allowed, proceed to next handler
+                        <span class="cov8" title="1">return next(c)</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package waffle
+
+import (
+        "net/http"
+)
+
+// Options contains configuration options for the Waffle WAF
+type Options struct {
+        useDefaultRules bool
+        limiter         RateLimiter
+        logger          Logger
+        blockHandler    func(*BlockReason) // Custom handler for blocked requests
+}
+
+// Option is a function that configures a Waffle instance
+type Option func(*Options)
+
+// defaultOptions returns the default configuration options
+func defaultOptions() *Options <span class="cov8" title="1">{
+        return &amp;Options{
+                useDefaultRules: true,
+                limiter:         nil, // No rate limiting by default
+                logger:          &amp;defaultLogger{},
+                blockHandler:    nil,
+        }
+}</span>
+
+// WithDefaultRules enables or disables the use of default security rules
+func WithDefaultRules(use bool) Option <span class="cov8" title="1">{
+        return func(o *Options) </span><span class="cov8" title="1">{
+                o.useDefaultRules = use
+        }</span>
+}
+
+// WithRateLimiter sets a custom rate limiter
+func WithRateLimiter(limiter RateLimiter) Option <span class="cov8" title="1">{
+        return func(o *Options) </span><span class="cov8" title="1">{
+                o.limiter = limiter
+        }</span>
+}
+
+// WithLogger sets a custom logger
+func WithLogger(logger Logger) Option <span class="cov8" title="1">{
+        return func(o *Options) </span><span class="cov8" title="1">{
+                o.logger = logger
+        }</span>
+}
+
+// WithBlockHandler sets a custom handler for blocked requests
+func WithBlockHandler(handler func(*BlockReason)) Option <span class="cov8" title="1">{
+        return func(o *Options) </span><span class="cov8" title="1">{
+                o.blockHandler = handler
+        }</span>
+}
+
+// defaultLogger is a basic implementation of the Logger interface
+type defaultLogger struct{}
+
+func (l *defaultLogger) LogAttack(r *http.Request, reason *BlockReason) <span class="cov8" title="1">{
+        // Simple stdout logging for now
+        // In a real implementation, this would be more sophisticated
+        println("ATTACK BLOCKED:", r.RemoteAddr, r.Method, r.URL.Path, "Reason:", reason.Rule, reason.Message)
+}</span>
+
+func (l *defaultLogger) LogRequest(r *http.Request) <span class="cov8" title="1">{
+        // Simple request logging
+        println("REQUEST:", r.RemoteAddr, r.Method, r.URL.Path)
+}</span>
+
+func (l *defaultLogger) LogError(err error) <span class="cov8" title="1">{
+        // Simple error logging
+        println("ERROR:", err.Error())
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package waffle
+
+import (
+        "net/http"
+        "sync"
+)
+
+// Waffle represents the Web Application Firewall instance
+type Waffle struct {
+        options *Options
+        rules   []Rule
+        limiter RateLimiter
+        logger  Logger
+        mu      sync.RWMutex
+}
+
+// New creates a new Waffle instance with the provided options
+func New(opts ...Option) *Waffle <span class="cov8" title="1">{
+        options := defaultOptions()
+        for _, opt := range opts </span><span class="cov8" title="1">{
+                opt(options)
+        }</span>
+
+        <span class="cov8" title="1">w := &amp;Waffle{
+                options: options,
+                rules:   make([]Rule, 0),
+                limiter: options.limiter,
+                logger:  options.logger,
+        }
+
+        // Load default rules if enabled
+        if options.useDefaultRules </span><span class="cov8" title="1">{
+                w.loadDefaultRules()
+        }</span>
+
+        <span class="cov8" title="1">return w</span>
+}
+
+// loadDefaultRules loads the default security rules
+func (w *Waffle) loadDefaultRules() <span class="cov8" title="1">{
+        // This will be implemented in the rules package
+        // For now, we'll just add placeholder rules
+        w.AddRule(NewSQLiRule())
+        w.AddRule(NewXSSRule())
+        w.AddRule(NewCommandInjectionRule())
+        w.AddRule(NewPathTraversalRule())
+        w.AddRule(NewUserAgentRule())
+}</span>
+
+// AddRule adds a new rule to the WAF
+func (w *Waffle) AddRule(rule Rule) <span class="cov8" title="1">{
+        w.mu.Lock()
+        defer w.mu.Unlock()
+        w.rules = append(w.rules, rule)
+}</span>
+
+// Process processes an HTTP request and determines if it should be blocked
+func (w *Waffle) Process(r *http.Request) (bool, *BlockReason) <span class="cov8" title="1">{
+        w.mu.RLock()
+        defer w.mu.RUnlock()
+
+        // Check rate limiting
+        if w.limiter != nil </span><span class="cov8" title="1">{
+                if exceeded, wait := w.limiter.Check(r); exceeded </span><span class="cov8" title="1">{
+                        return true, &amp;BlockReason{
+                                Rule:    "rate_limit",
+                                Message: "Rate limit exceeded",
+                                Wait:    wait,
+                        }
+                }</span>
+        }
+
+        // Check each rule
+        <span class="cov8" title="1">for _, rule := range w.rules </span><span class="cov8" title="1">{
+                if rule.IsEnabled() </span><span class="cov8" title="1">{
+                        if match, reason := rule.Match(r); match </span><span class="cov8" title="1">{
+                                w.logger.LogAttack(r, reason)
+                                return true, reason
+                        }</span>
+                }
+        }
+
+        <span class="cov8" title="1">return false, nil</span>
+}
+
+// BlockReason contains information about why a request was blocked
+type BlockReason struct {
+        Rule    string
+        Message string
+        Wait    int // For rate limiting, seconds to wait
+}
+
+// Rule defines the interface for WAF rules
+type Rule interface {
+        Match(*http.Request) (bool, *BlockReason)
+        IsEnabled() bool
+        Enable()
+        Disable()
+}
+
+// RateLimiter defines the interface for rate limiters
+type RateLimiter interface {
+        Check(*http.Request) (bool, int) // Returns (exceeded, wait time in seconds)
+        Reset(*http.Request)
+}
+
+// Logger defines the interface for WAF loggers
+type Logger interface {
+        LogAttack(*http.Request, *BlockReason)
+        LogRequest(*http.Request)
+        LogError(error)
+}
+
+// Placeholder rule implementations
+// These will be moved to their own files in the detectors package
+
+func NewSQLiRule() Rule <span class="cov8" title="1">{
+        return &amp;baseRule{
+                name:    "sql_injection",
+                enabled: true,
+                matchFn: func(r *http.Request) (bool, *BlockReason) </span><span class="cov8" title="1">{
+                        // Placeholder implementation
+                        return false, nil
+                }</span>,
+        }
+}
+
+func NewXSSRule() Rule <span class="cov8" title="1">{
+        return &amp;baseRule{
+                name:    "xss",
+                enabled: true,
+                matchFn: func(r *http.Request) (bool, *BlockReason) </span><span class="cov8" title="1">{
+                        // Placeholder implementation
+                        return false, nil
+                }</span>,
+        }
+}
+
+func NewCommandInjectionRule() Rule <span class="cov8" title="1">{
+        return &amp;baseRule{
+                name:    "command_injection",
+                enabled: true,
+                matchFn: func(r *http.Request) (bool, *BlockReason) </span><span class="cov8" title="1">{
+                        // Placeholder implementation
+                        return false, nil
+                }</span>,
+        }
+}
+
+func NewPathTraversalRule() Rule <span class="cov8" title="1">{
+        return &amp;baseRule{
+                name:    "path_traversal",
+                enabled: true,
+                matchFn: func(r *http.Request) (bool, *BlockReason) </span><span class="cov8" title="1">{
+                        // Placeholder implementation
+                        return false, nil
+                }</span>,
+        }
+}
+
+func NewUserAgentRule() Rule <span class="cov8" title="1">{
+        return &amp;baseRule{
+                name:    "user_agent",
+                enabled: true,
+                matchFn: func(r *http.Request) (bool, *BlockReason) </span><span class="cov8" title="1">{
+                        // Placeholder implementation
+                        return false, nil
+                }</span>,
+        }
+}
+
+// baseRule is a basic implementation of the Rule interface
+type baseRule struct {
+        name    string
+        enabled bool
+        matchFn func(*http.Request) (bool, *BlockReason)
+}
+
+func (r *baseRule) Match(req *http.Request) (bool, *BlockReason) <span class="cov8" title="1">{
+        return r.matchFn(req)
+}</span>
+
+func (r *baseRule) IsEnabled() bool <span class="cov8" title="1">{
+        return r.enabled
+}</span>
+
+func (r *baseRule) Enable() <span class="cov8" title="1">{
+        r.enabled = true
+}</span>
+
+func (r *baseRule) Disable() <span class="cov8" title="1">{
+        r.enabled = false
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
