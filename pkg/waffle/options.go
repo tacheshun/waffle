@@ -1,7 +1,9 @@
 package waffle
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 )
 
 // Options contains configuration options for the Waffle WAF
@@ -9,6 +11,7 @@ type Options struct {
 	useDefaultRules bool
 	limiter         RateLimiter
 	logger          Logger
+	logAllRequests  bool               // Whether to log all requests, not just attacks
 	blockHandler    func(*BlockReason) // Custom handler for blocked requests
 }
 
@@ -21,6 +24,7 @@ func defaultOptions() *Options {
 		useDefaultRules: true,
 		limiter:         nil, // No rate limiting by default
 		logger:          &defaultLogger{},
+		logAllRequests:  false,
 		blockHandler:    nil,
 	}
 }
@@ -53,21 +57,29 @@ func WithBlockHandler(handler func(*BlockReason)) Option {
 	}
 }
 
+// WithLogAllRequests enables or disables logging for all requests
+func WithLogAllRequests(logAll bool) Option {
+	return func(o *Options) {
+		o.logAllRequests = logAll
+	}
+}
+
 // defaultLogger is a basic implementation of the Logger interface
 type defaultLogger struct{}
 
 func (l *defaultLogger) LogAttack(r *http.Request, reason *BlockReason) {
-	// Simple stdout logging for now
-	// In a real implementation, this would be more sophisticated
-	println("ATTACK BLOCKED:", r.RemoteAddr, r.Method, r.URL.Path, "Reason:", reason.Rule, reason.Message)
+	// Better logging with structured information
+	fmt.Fprintf(os.Stderr, "ATTACK BLOCKED: IP=%s Method=%s Path=%s Rule=%s Message=%s\n",
+		r.RemoteAddr, r.Method, r.URL.Path, reason.Rule, reason.Message)
 }
 
 func (l *defaultLogger) LogRequest(r *http.Request) {
-	// Simple request logging
-	println("REQUEST:", r.RemoteAddr, r.Method, r.URL.Path)
+	// Better structured request logging
+	fmt.Fprintf(os.Stderr, "REQUEST: IP=%s Method=%s Path=%s UserAgent=%s\n",
+		r.RemoteAddr, r.Method, r.URL.Path, r.UserAgent())
 }
 
 func (l *defaultLogger) LogError(err error) {
-	// Simple error logging
-	println("ERROR:", err.Error())
+	// Better error logging
+	fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
 }

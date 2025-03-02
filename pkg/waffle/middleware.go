@@ -1,6 +1,7 @@
 package waffle
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -15,25 +16,38 @@ func (w *Waffle) Middleware(next http.Handler) http.Handler {
 		blocked, reason := w.Process(r)
 
 		if blocked {
+			// Log the block event
+			w.logger.LogAttack(r, reason)
+
 			// Request is blocked
 			if w.options.blockHandler != nil {
 				// Use custom block handler if provided
 				w.options.blockHandler(reason)
 			} else {
 				// Default block behavior
-				rw.WriteHeader(http.StatusForbidden)
-				_, err := rw.Write([]byte("Forbidden: " + reason.Message))
-				if err != nil {
-					// If write fails, we've already sent the header
-					_ = err // Prevent empty branch warning
-				}
+				header := rw.Header()
 
 				// If rate limited, add retry-after header
 				if reason.Rule == "rate_limit" && reason.Wait > 0 {
-					rw.Header().Set("Retry-After", time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+					retryAfter := time.Now().Add(time.Duration(reason.Wait) * time.Second).Format(time.RFC1123)
+					header.Set("Retry-After", retryAfter)
+				}
+
+				// Set content type before writing status
+				header.Set("Content-Type", "text/plain; charset=utf-8")
+				rw.WriteHeader(http.StatusForbidden)
+
+				msg := fmt.Sprintf("Forbidden: %s", reason.Message)
+				if _, err := rw.Write([]byte(msg)); err != nil {
+					w.logger.LogError(fmt.Errorf("failed to write response: %w", err))
 				}
 			}
 			return
+		}
+
+		// Log allowed request if configured
+		if w.options.logAllRequests {
+			w.logger.LogRequest(r)
 		}
 
 		// Request is allowed, proceed to next handler
@@ -48,25 +62,38 @@ func (w *Waffle) HandlerFunc(next http.HandlerFunc) http.HandlerFunc {
 		blocked, reason := w.Process(r)
 
 		if blocked {
+			// Log the block event
+			w.logger.LogAttack(r, reason)
+
 			// Request is blocked
 			if w.options.blockHandler != nil {
 				// Use custom block handler if provided
 				w.options.blockHandler(reason)
 			} else {
 				// Default block behavior
-				rw.WriteHeader(http.StatusForbidden)
-				_, err := rw.Write([]byte("Forbidden: " + reason.Message))
-				if err != nil {
-					// If write fails, we've already sent the header
-					_ = err // Prevent empty branch warning
-				}
+				header := rw.Header()
 
 				// If rate limited, add retry-after header
 				if reason.Rule == "rate_limit" && reason.Wait > 0 {
-					rw.Header().Set("Retry-After", time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+					retryAfter := time.Now().Add(time.Duration(reason.Wait) * time.Second).Format(time.RFC1123)
+					header.Set("Retry-After", retryAfter)
+				}
+
+				// Set content type before writing status
+				header.Set("Content-Type", "text/plain; charset=utf-8")
+				rw.WriteHeader(http.StatusForbidden)
+
+				msg := fmt.Sprintf("Forbidden: %s", reason.Message)
+				if _, err := rw.Write([]byte(msg)); err != nil {
+					w.logger.LogError(fmt.Errorf("failed to write response: %w", err))
 				}
 			}
 			return
+		}
+
+		// Log allowed request if configured
+		if w.options.logAllRequests {
+			w.logger.LogRequest(r)
 		}
 
 		// Request is allowed, proceed to next handler
@@ -81,22 +108,35 @@ func (w *Waffle) GinMiddleware() gin.HandlerFunc {
 		blocked, reason := w.Process(c.Request)
 
 		if blocked {
+			// Log the block event
+			w.logger.LogAttack(c.Request, reason)
+
 			// Request is blocked
 			if w.options.blockHandler != nil {
 				// Use custom block handler if provided
 				w.options.blockHandler(reason)
 				c.Abort()
 			} else {
-				// Default block behavior
-				c.AbortWithStatus(http.StatusForbidden)
-				c.String(http.StatusForbidden, "Forbidden: "+reason.Message)
-
 				// If rate limited, add retry-after header
 				if reason.Rule == "rate_limit" && reason.Wait > 0 {
-					c.Header("Retry-After", time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+					retryAfter := time.Now().Add(time.Duration(reason.Wait) * time.Second).Format(time.RFC1123)
+					c.Header("Retry-After", retryAfter)
 				}
+
+				// Default block behavior with proper content type
+				c.Header("Content-Type", "text/plain; charset=utf-8")
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+					"error":   "Forbidden",
+					"message": reason.Message,
+					"rule":    reason.Rule,
+				})
 			}
 			return
+		}
+
+		// Log allowed request if configured
+		if w.options.logAllRequests {
+			w.logger.LogRequest(c.Request)
 		}
 
 		// Request is allowed, proceed to next handler
@@ -112,6 +152,9 @@ func (w *Waffle) EchoMiddleware() echo.MiddlewareFunc {
 			blocked, reason := w.Process(c.Request())
 
 			if blocked {
+				// Log the block event
+				w.logger.LogAttack(c.Request(), reason)
+
 				// Request is blocked
 				if w.options.blockHandler != nil {
 					// Use custom block handler if provided
@@ -121,11 +164,21 @@ func (w *Waffle) EchoMiddleware() echo.MiddlewareFunc {
 
 				// If rate limited, add retry-after header
 				if reason.Rule == "rate_limit" && reason.Wait > 0 {
-					c.Response().Header().Set("Retry-After",
-						time.Now().Add(time.Duration(reason.Wait)*time.Second).Format(time.RFC1123))
+					retryAfter := time.Now().Add(time.Duration(reason.Wait) * time.Second).Format(time.RFC1123)
+					c.Response().Header().Set("Retry-After", retryAfter)
 				}
 
-				return c.String(http.StatusForbidden, "Forbidden: "+reason.Message)
+				// Return a JSON response with proper status and content type
+				return c.JSON(http.StatusForbidden, map[string]interface{}{
+					"error":   "Forbidden",
+					"message": reason.Message,
+					"rule":    reason.Rule,
+				})
+			}
+
+			// Log allowed request if configured
+			if w.options.logAllRequests {
+				w.logger.LogRequest(c.Request())
 			}
 
 			// Request is allowed, proceed to next handler

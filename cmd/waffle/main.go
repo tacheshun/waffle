@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -8,6 +9,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/tacheshun/waffle/internal/version"
 	"github.com/tacheshun/waffle/pkg/waffle"
@@ -29,15 +33,15 @@ func main() {
 
 	// Check if backend URL is provided
 	if *backendURL == "" {
-		fmt.Println("Error: Backend URL is required")
-		fmt.Println("Usage: waffle -listen :8080 -backend http://myapp:3000 [-config config.yaml]")
+		fmt.Fprintf(os.Stderr, "Error: Backend URL is required\n")
+		fmt.Fprintf(os.Stderr, "Usage: waffle -listen :8080 -backend http://myapp:3000 [-config config.yaml]\n")
 		os.Exit(1)
 	}
 
 	// Parse backend URL
 	target, err := url.Parse(*backendURL)
 	if err != nil {
-		log.Fatalf("Invalid backend URL: %v", err)
+		log.Fatalf("Invalid backend URL %q: %v", *backendURL, err)
 	}
 
 	// Create reverse proxy
@@ -46,8 +50,13 @@ func main() {
 	// Initialize WAF
 	var waf *waffle.Waffle
 	if *configFile != "" {
+		// Check if config file exists
+		if _, err := os.Stat(*configFile); os.IsNotExist(err) {
+			log.Fatalf("Configuration file %q does not exist: %v", *configFile, err)
+		}
+
+		fmt.Printf("Loading configuration from %s\n", *configFile)
 		// TODO: Load configuration from file
-		fmt.Println("Loading configuration from", *configFile)
 		waf = waffle.New() // Placeholder, will be replaced with config loading
 	} else {
 		// Use default configuration
@@ -57,13 +66,41 @@ func main() {
 	// Create handler with WAF middleware
 	handler := waf.Middleware(proxy)
 
+	// Create server
+	server := &http.Server{
+		Addr:    *listenAddr,
+		Handler: handler,
+	}
+
+	// Set up graceful shutdown
+	done := make(chan bool, 1)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
 	// Print startup banner
 	fmt.Printf("Starting %s\n", version.BuildInfo())
 	fmt.Printf("Listening on %s, proxying to %s\n", *listenAddr, *backendURL)
 
-	// Start server
-	err = http.ListenAndServe(*listenAddr, handler)
-	if err != nil {
-		log.Fatalf("Server error: %v", err)
+	// Start server in a goroutine
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// Wait for shutdown signal
+	<-quit
+	log.Println("Server is shutting down...")
+
+	// Create context with timeout for graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Attempt graceful shutdown
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
 	}
+
+	log.Println("Server exited gracefully")
+	close(done)
 }

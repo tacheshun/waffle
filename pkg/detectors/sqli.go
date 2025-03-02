@@ -1,6 +1,7 @@
 package detectors
 
 import (
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -10,13 +11,34 @@ import (
 type SQLiDetector struct {
 	enabled  bool
 	patterns []*regexp.Regexp
+	name     string
+}
+
+// ErrParseForm is returned when form parsing fails
+type ErrParseForm struct {
+	Err error
+}
+
+func (e *ErrParseForm) Error() string {
+	return fmt.Sprintf("failed to parse form data: %v", e.Err)
+}
+
+func (e *ErrParseForm) Unwrap() error {
+	return e.Err
 }
 
 // NewSQLiDetector creates a new SQL injection detector
 func NewSQLiDetector() *SQLiDetector {
+	patterns, err := compileSQLiPatterns()
+	if err != nil {
+		// Log the error but continue with any successfully compiled patterns
+		fmt.Printf("Warning: Some SQL injection patterns failed to compile: %v\n", err)
+	}
+
 	detector := &SQLiDetector{
 		enabled:  true,
-		patterns: compileSQLiPatterns(),
+		patterns: patterns,
+		name:     "sql_injection",
 	}
 	return detector
 }
@@ -27,27 +49,38 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 		return false, nil
 	}
 
+	if r == nil {
+		return false, nil
+	}
+
 	// Parse form data to access POST parameters
-	if err := r.ParseForm(); err != nil {
-		// If form parsing fails, continue with what we can check
-		_ = err // Prevent empty branch warning
+	if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
+		// Only try to parse the form for methods that might have form data
+		err := r.ParseForm()
+		if err != nil {
+			// Still continue with what we can check, but wrap the error for better context
+			return false, &BlockReason{
+				Rule:    "internal_error",
+				Message: (&ErrParseForm{Err: err}).Error(),
+			}
+		}
 	}
 
 	// Check URL path
-	if d.checkString(r.URL.Path) {
+	if matched, pattern := d.checkString(r.URL.Path); matched {
 		return true, &BlockReason{
-			Rule:    "sql_injection",
-			Message: "SQL injection detected in URL path",
+			Rule:    d.name,
+			Message: fmt.Sprintf("SQL injection pattern '%s' detected in URL path", pattern),
 		}
 	}
 
 	// Check query parameters
 	for key, values := range r.URL.Query() {
 		for _, value := range values {
-			if d.checkString(value) {
+			if matched, pattern := d.checkString(value); matched {
 				return true, &BlockReason{
-					Rule:    "sql_injection",
-					Message: "SQL injection detected in query parameter: " + key,
+					Rule:    d.name,
+					Message: fmt.Sprintf("SQL injection pattern '%s' detected in query parameter: %s", pattern, key),
 				}
 			}
 		}
@@ -56,10 +89,10 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 	// Check form parameters
 	for key, values := range r.Form {
 		for _, value := range values {
-			if d.checkString(value) {
+			if matched, pattern := d.checkString(value); matched {
 				return true, &BlockReason{
-					Rule:    "sql_injection",
-					Message: "SQL injection detected in form parameter: " + key,
+					Rule:    d.name,
+					Message: fmt.Sprintf("SQL injection pattern '%s' detected in form parameter: %s", pattern, key),
 				}
 			}
 		}
@@ -67,22 +100,22 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 
 	// Check cookies
 	for _, cookie := range r.Cookies() {
-		if d.checkString(cookie.Value) {
+		if matched, pattern := d.checkString(cookie.Value); matched {
 			return true, &BlockReason{
-				Rule:    "sql_injection",
-				Message: "SQL injection detected in cookie: " + cookie.Name,
+				Rule:    d.name,
+				Message: fmt.Sprintf("SQL injection pattern '%s' detected in cookie: %s", pattern, cookie.Name),
 			}
 		}
 	}
 
 	// Check headers (some common ones that might be used in SQL)
-	headersToCheck := []string{"User-Agent", "Referer", "X-Forwarded-For"}
+	headersToCheck := []string{"User-Agent", "Referer", "X-Forwarded-For", "X-Real-IP", "Authorization"}
 	for _, header := range headersToCheck {
 		if value := r.Header.Get(header); value != "" {
-			if d.checkString(value) {
+			if matched, pattern := d.checkString(value); matched {
 				return true, &BlockReason{
-					Rule:    "sql_injection",
-					Message: "SQL injection detected in header: " + header,
+					Rule:    d.name,
+					Message: fmt.Sprintf("SQL injection pattern '%s' detected in header: %s", pattern, header),
 				}
 			}
 		}
@@ -107,22 +140,29 @@ func (d *SQLiDetector) Disable() {
 }
 
 // checkString checks if a string contains SQL injection patterns
-func (d *SQLiDetector) checkString(s string) bool {
+// Returns (matched, pattern that matched)
+func (d *SQLiDetector) checkString(s string) (bool, string) {
+	if s == "" {
+		return false, ""
+	}
+
 	// Normalize the string
 	s = strings.ToLower(s)
 
 	// Check against patterns
 	for _, pattern := range d.patterns {
 		if pattern.MatchString(s) {
-			return true
+			return true, pattern.String()
 		}
 	}
 
-	return false
+	return false, ""
 }
 
 // compileSQLiPatterns compiles regex patterns for SQL injection detection
-func compileSQLiPatterns() []*regexp.Regexp {
+// Returns any errors that occurred during compilation, but still returns
+// all successfully compiled patterns
+func compileSQLiPatterns() ([]*regexp.Regexp, error) {
 	// Common SQL injection patterns
 	patterns := []string{
 		`(?i)(\%27)|(\')|(\-\-)|(\%23)|(#)`,
@@ -139,14 +179,22 @@ func compileSQLiPatterns() []*regexp.Regexp {
 	}
 
 	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	var compileErrors error
+
 	for _, pattern := range patterns {
 		re, err := regexp.Compile(pattern)
-		if err == nil {
-			compiled = append(compiled, re)
+		if err != nil {
+			if compileErrors == nil {
+				compileErrors = fmt.Errorf("failed to compile pattern %q: %w", pattern, err)
+			} else {
+				compileErrors = fmt.Errorf("%v; failed to compile pattern %q: %w", compileErrors, pattern, err)
+			}
+			continue
 		}
+		compiled = append(compiled, re)
 	}
 
-	return compiled
+	return compiled, compileErrors
 }
 
 // BlockReason contains information about why a request was blocked
