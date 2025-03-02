@@ -9,7 +9,7 @@ import (
 func TestTokenBucketLimiter_Allow(t *testing.T) {
 	tests := []struct {
 		name           string
-		rate           int
+		rate           float64
 		burst          int
 		requestsToSend int
 		wantExceeded   bool

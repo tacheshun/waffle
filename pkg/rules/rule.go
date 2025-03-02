@@ -11,6 +11,18 @@ type BlockReason struct {
 	Wait    int // For rate limiting, seconds to wait
 }
 
+// Target defines which part of the request to check for rule matching
+type Target int
+
+const (
+	// TargetPath targets the URL path
+	TargetPath Target = iota
+	// TargetBody targets the request body
+	TargetBody
+	// TargetHeader targets request headers
+	TargetHeader
+)
+
 // Rule defines the interface for WAF rules
 type Rule interface {
 	// Match checks if the request matches the rule
@@ -24,13 +36,16 @@ type Rule interface {
 
 	// Disable disables the rule
 	Disable()
+
+	// Name returns the rule name
+	Name() string
 }
 
 // BaseRule is a basic implementation of the Rule interface
 type BaseRule struct {
-	Name    string
-	Enabled bool
-	MatchFn func(*http.Request) (bool, *BlockReason)
+	RuleName string
+	Enabled  bool
+	MatchFn  func(*http.Request) (bool, *BlockReason)
 }
 
 // Match checks if the request matches the rule
@@ -56,11 +71,16 @@ func (r *BaseRule) Disable() {
 	r.Enabled = false
 }
 
+// Name returns the rule name
+func (r *BaseRule) Name() string {
+	return r.RuleName
+}
+
 // NewRule creates a new rule with the given name and match function
 func NewRule(name string, matchFn func(*http.Request) (bool, *BlockReason)) *BaseRule {
 	return &BaseRule{
-		Name:    name,
-		Enabled: true,
-		MatchFn: matchFn,
+		RuleName: name,
+		Enabled:  true,
+		MatchFn:  matchFn,
 	}
 }

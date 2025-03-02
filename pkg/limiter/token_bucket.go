@@ -9,11 +9,12 @@ import (
 
 // TokenBucketLimiter implements rate limiting using the token bucket algorithm
 type TokenBucketLimiter struct {
-	buckets    map[string]*bucket
-	rate       float64 // tokens per second
-	burst      int     // maximum bucket size
-	mutex      sync.RWMutex
-	lastUpdate time.Time
+	buckets          map[string]*bucket
+	rate             float64 // tokens per second
+	burst            int     // maximum bucket size
+	mutex            sync.RWMutex
+	lastUpdate       time.Time
+	useXForwardedFor bool
 }
 
 // bucket represents a token bucket for a single client
@@ -25,17 +26,25 @@ type bucket struct {
 // NewTokenBucketLimiter creates a new token bucket limiter with the specified rate and burst size
 func NewTokenBucketLimiter(rate float64, burst int) *TokenBucketLimiter {
 	return &TokenBucketLimiter{
-		buckets:    make(map[string]*bucket),
-		rate:       rate,
-		burst:      burst,
-		lastUpdate: time.Now(),
+		buckets:          make(map[string]*bucket),
+		rate:             rate,
+		burst:            burst,
+		lastUpdate:       time.Now(),
+		useXForwardedFor: false,
 	}
 }
 
+// UseXForwardedFor configures the limiter to use X-Forwarded-For header for IP extraction
+func (l *TokenBucketLimiter) UseXForwardedFor(use bool) {
+	l.useXForwardedFor = use
+}
+
 // Allow checks if a request should be allowed based on rate limits
-func (l *TokenBucketLimiter) Allow(r *http.Request) bool {
+// Returns (exceeded bool, wait int) - where exceeded is true if the rate limit is exceeded,
+// and wait indicates the recommended wait time in seconds before retrying
+func (l *TokenBucketLimiter) Allow(r *http.Request) (bool, int) {
 	// Extract client IP from request
-	clientIP := extractIP(r)
+	clientIP := l.extractIP(r)
 
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
@@ -61,21 +70,29 @@ func (l *TokenBucketLimiter) Allow(r *http.Request) bool {
 	// Check if there's at least one token available
 	if b.tokens >= 1.0 {
 		b.tokens--
-		return true
+		return false, 0 // Not exceeded, no wait time
 	}
 
-	return false
+	// Calculate wait time (time until 1 token becomes available)
+	waitTime := int((1.0 - b.tokens) / l.rate)
+	if waitTime < 1 {
+		waitTime = 1 // Minimum wait time of 1 second
+	}
+
+	return true, waitTime // Exceeded, with wait time
 }
 
 // extractIP extracts the client IP from the request
-func extractIP(r *http.Request) string {
-	// Check X-Forwarded-For header
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP in the list
-		if comma := strings.Index(xff, ","); comma > 0 {
-			return strings.TrimSpace(xff[:comma])
+func (l *TokenBucketLimiter) extractIP(r *http.Request) string {
+	// Check X-Forwarded-For header if enabled
+	if l.useXForwardedFor {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			// Take the first IP in the list
+			if comma := strings.Index(xff, ","); comma > 0 {
+				return strings.TrimSpace(xff[:comma])
+			}
+			return strings.TrimSpace(xff)
 		}
-		return strings.TrimSpace(xff)
 	}
 
 	// Use RemoteAddr as fallback

@@ -31,7 +31,7 @@ func (rs *RuleSet) RemoveRule(name string) {
 	defer rs.mu.Unlock()
 
 	for i, rule := range rs.rules {
-		if baseRule, ok := rule.(*BaseRule); ok && baseRule.Name == name {
+		if rule.Name() == name {
 			// Remove the rule by replacing it with the last element and truncating
 			rs.rules[i] = rs.rules[len(rs.rules)-1]
 			rs.rules = rs.rules[:len(rs.rules)-1]
@@ -46,11 +46,10 @@ func (rs *RuleSet) GetRule(name string) Rule {
 	defer rs.mu.RUnlock()
 
 	for _, rule := range rs.rules {
-		if baseRule, ok := rule.(*BaseRule); ok && baseRule.Name == name {
+		if rule.Name() == name {
 			return rule
 		}
 	}
-
 	return nil
 }
 
@@ -60,7 +59,7 @@ func (rs *RuleSet) EnableRule(name string) {
 	defer rs.mu.RUnlock()
 
 	for _, rule := range rs.rules {
-		if baseRule, ok := rule.(*BaseRule); ok && baseRule.Name == name {
+		if rule.Name() == name {
 			rule.Enable()
 			return
 		}
@@ -73,7 +72,7 @@ func (rs *RuleSet) DisableRule(name string) {
 	defer rs.mu.RUnlock()
 
 	for _, rule := range rs.rules {
-		if baseRule, ok := rule.(*BaseRule); ok && baseRule.Name == name {
+		if rule.Name() == name {
 			rule.Disable()
 			return
 		}

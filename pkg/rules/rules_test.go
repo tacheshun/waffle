@@ -248,17 +248,6 @@ func createBodyReader(body string) *stringReader {
 	return &stringReader{body: body, position: 0}
 }
 
-// stringReader is a simple io.Reader implementation for testing
-type stringReader struct {
-	body     string
-	position int
-}
-
-func (r *stringReader) Read(p []byte) (n int, err error) {
-	if r.position >= len(r.body) {
-		return 0, nil
-	}
-	n = copy(p, r.body[r.position:])
-	r.position += n
-	return n, nil
+func TestRuleMatchers(t *testing.T) {
+	// ... existing code ...
 }
