@@ -54,7 +54,11 @@ func NewSQLiRule() Rule {
 
 	return NewRule("sql_injection", func(r *http.Request) (bool, *BlockReason) {
 		// Parse form data to access POST parameters
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			// If we can't parse the form, we can't check it for SQL injection
+			// Just continue with what we can check
+			_ = err // Prevent empty branch warning
+		}
 
 		// Check URL path
 		if checkPatterns(r.URL.Path, compiled) {
@@ -118,7 +122,11 @@ func NewXSSRule() Rule {
 
 	return NewRule("xss", func(r *http.Request) (bool, *BlockReason) {
 		// Parse form data to access POST parameters
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			// If we can't parse the form, we can't check it for XSS
+			// Just continue with what we can check
+			_ = err // Prevent empty branch warning
+		}
 
 		// Check query parameters
 		for key, values := range r.URL.Query() {
@@ -165,7 +173,11 @@ func NewCommandInjectionRule() Rule {
 
 	return NewRule("command_injection", func(r *http.Request) (bool, *BlockReason) {
 		// Parse form data to access POST parameters
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			// If we can't parse the form, we can't check it for command injection
+			// Just continue with what we can check
+			_ = err // Prevent empty branch warning
+		}
 
 		// Check query parameters
 		for key, values := range r.URL.Query() {

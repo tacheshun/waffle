@@ -60,6 +60,8 @@ func TestMiddleware(t *testing.T) {
 				w := New(WithBlockHandler(func(reason *BlockReason) {
 					// Custom handler just returns without writing a response
 					// This simulates a custom handler that handles the response itself
+					// This empty block is intentional for testing purposes
+					_ = reason // Prevent empty block warning
 				}))
 				w.AddRule(&testRule{
 					name:     "test_rule",
@@ -165,6 +167,8 @@ func TestHandlerFunc(t *testing.T) {
 				w := New(WithBlockHandler(func(reason *BlockReason) {
 					// Custom handler just returns without writing a response
 					// This simulates a custom handler that handles the response itself
+					// This empty block is intentional for testing purposes
+					_ = reason // Prevent empty block warning
 				}))
 				w.AddRule(&testRule{
 					name:     "test_rule",
@@ -273,6 +277,8 @@ func TestGinMiddleware(t *testing.T) {
 				w := New(WithBlockHandler(func(reason *BlockReason) {
 					// Custom handler just returns without writing a response
 					// This simulates a custom handler that handles the response itself
+					// This empty block is intentional for testing purposes
+					_ = reason // Prevent empty block warning
 				}))
 				w.AddRule(&testRule{
 					name:     "test_rule",
@@ -375,6 +381,8 @@ func TestEchoMiddleware(t *testing.T) {
 				w := New(WithBlockHandler(func(reason *BlockReason) {
 					// Custom handler just returns without writing a response
 					// This simulates a custom handler that handles the response itself
+					// This empty block is intentional for testing purposes
+					_ = reason // Prevent empty block warning
 				}))
 				w.AddRule(&testRule{
 					name:     "test_rule",

@@ -40,6 +40,7 @@ func (d *PathTraversalDetector) Match(r *http.Request) (bool, *BlockReason) {
 	// Parse form data to access POST parameters
 	if err := r.ParseForm(); err != nil {
 		// If form parsing fails, continue with what we can check
+		_ = err // Prevent empty branch warning
 	}
 
 	// Check query parameters
@@ -181,6 +182,7 @@ func (d *PathTraversalDetector) Detect(r *http.Request) (bool, *waffle.BlockReas
 	// Parse form data to check for path traversal in POST parameters
 	if err := r.ParseForm(); err != nil {
 		// If form parsing fails, continue with what we can check
+		_ = err // Prevent empty branch warning
 	}
 
 	// Check URL path first (most common vector)

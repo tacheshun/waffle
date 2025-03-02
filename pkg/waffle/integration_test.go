@@ -311,6 +311,25 @@ func (d *mockDetector) Detect(r *http.Request) (bool, string) {
 // 	r.enabled = false
 // }
 
+// TestHandlerFunctions tests the handler functions used in integration tests
+func TestHandlerFunctions(t *testing.T) {
+	// Test testHandler
+	w1 := httptest.NewRecorder()
+	r1 := httptest.NewRequest("GET", "/test", nil)
+	testHandler(w1, r1)
+	if w1.Body.String() != "OK" {
+		t.Errorf("testHandler did not write 'OK' to response, got: %s", w1.Body.String())
+	}
+
+	// Test testHandlerCustomLogic
+	w2 := httptest.NewRecorder()
+	r2 := httptest.NewRequest("GET", "/test-custom", nil)
+	testHandlerCustomLogic(w2, r2)
+	if w2.Body.String() != "OK" {
+		t.Errorf("testHandlerCustomLogic did not write 'OK' to response, got: %s", w2.Body.String())
+	}
+}
+
 // testHandler is a simple HTTP handler for testing
 func testHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := w.Write([]byte("OK"))

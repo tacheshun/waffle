@@ -25,7 +25,7 @@ func (w *Waffle) Middleware(next http.Handler) http.Handler {
 				_, err := rw.Write([]byte("Forbidden: " + reason.Message))
 				if err != nil {
 					// If write fails, we've already sent the header
-					// Log would be appropriate here in production code
+					_ = err // Prevent empty branch warning
 				}
 
 				// If rate limited, add retry-after header
@@ -58,6 +58,7 @@ func (w *Waffle) HandlerFunc(next http.HandlerFunc) http.HandlerFunc {
 				_, err := rw.Write([]byte("Forbidden: " + reason.Message))
 				if err != nil {
 					// If write fails, we've already sent the header
+					_ = err // Prevent empty branch warning
 				}
 
 				// If rate limited, add retry-after header

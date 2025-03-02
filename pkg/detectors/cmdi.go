@@ -30,6 +30,7 @@ func (d *CommandInjectionDetector) Match(r *http.Request) (bool, *BlockReason) {
 	// Parse form data to access POST parameters
 	if err := r.ParseForm(); err != nil {
 		// If form parsing fails, continue with what we can check
+		_ = err // Prevent empty branch warning
 	}
 
 	// Check URL path
