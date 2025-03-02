@@ -57,17 +57,18 @@ release:
   draft: false
   name_template: "Waffle {{.Version}}"
 
-brews:
-  - repository:
-      owner: tacheshun
-      name: homebrew-tools
-    commit_author:
-      name: goreleaserbot
-      email: goreleaser@carlosbecker.com
-    homepage: https://github.com/tacheshun/waffle
-    description: Lightweight Web Application Firewall (WAF) written in Go
-    license: MIT
-    test: |
-      system "#{bin}/waffle --version"
-    install: |
-      bin.install "waffle" 
+# Commenting out the brews section until the repository is created
+# brews:
+#   - repository:
+#       owner: tacheshun
+#       name: homebrew-tools
+#     commit_author:
+#       name: goreleaserbot
+#       email: goreleaser@carlosbecker.com
+#     homepage: https://github.com/tacheshun/waffle
+#     description: Lightweight Web Application Firewall (WAF) written in Go
+#     license: MIT
+#     test: |
+#       system "#{bin}/waffle --version"
+#     install: |
+#       bin.install "waffle" 
