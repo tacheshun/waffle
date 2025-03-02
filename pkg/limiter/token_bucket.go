@@ -115,3 +115,28 @@ func min(a, b float64) float64 {
 	}
 	return b
 }
+
+// Check implements the RateLimiter interface
+func (l *TokenBucketLimiter) Check(r *http.Request) (bool, int, error) {
+	if r == nil {
+		return false, 0, ErrNilRequest
+	}
+
+	exceeded, wait := l.Allow(r)
+	return exceeded, wait, nil
+}
+
+// Reset implements the RateLimiter interface
+func (l *TokenBucketLimiter) Reset(r *http.Request) error {
+	if r == nil {
+		return ErrNilRequest
+	}
+
+	clientIP := l.extractIP(r)
+
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+
+	delete(l.buckets, clientIP)
+	return nil
+}

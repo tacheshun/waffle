@@ -441,10 +441,11 @@ type testRateLimiter struct {
 	waitTime    int
 }
 
-func (r *testRateLimiter) Check(req *http.Request) (bool, int) {
-	return r.shouldLimit, r.waitTime
+func (r *testRateLimiter) Check(req *http.Request) (bool, int, error) {
+	return r.shouldLimit, r.waitTime, nil
 }
 
-func (r *testRateLimiter) Reset(req *http.Request) {
+func (r *testRateLimiter) Reset(req *http.Request) error {
 	// Do nothing for testing
+	return nil
 }

@@ -125,11 +125,8 @@ func (w *Waffle) GinMiddleware() gin.HandlerFunc {
 
 				// Default block behavior with proper content type
 				c.Header("Content-Type", "text/plain; charset=utf-8")
-				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
-					"error":   "Forbidden",
-					"message": reason.Message,
-					"rule":    reason.Rule,
-				})
+				c.AbortWithStatus(http.StatusForbidden)
+				c.String(http.StatusForbidden, "Forbidden: %s", reason.Message)
 			}
 			return
 		}
@@ -168,12 +165,9 @@ func (w *Waffle) EchoMiddleware() echo.MiddlewareFunc {
 					c.Response().Header().Set("Retry-After", retryAfter)
 				}
 
-				// Return a JSON response with proper status and content type
-				return c.JSON(http.StatusForbidden, map[string]interface{}{
-					"error":   "Forbidden",
-					"message": reason.Message,
-					"rule":    reason.Rule,
-				})
+				// Return a plain text response with proper status and content type
+				c.Response().Header().Set("Content-Type", "text/plain; charset=utf-8")
+				return c.String(http.StatusForbidden, fmt.Sprintf("Forbidden: %s", reason.Message))
 			}
 
 			// Log allowed request if configured

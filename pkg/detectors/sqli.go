@@ -67,20 +67,20 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 	}
 
 	// Check URL path
-	if matched, pattern := d.checkString(r.URL.Path); matched {
+	if matched, _ := d.checkString(r.URL.Path); matched {
 		return true, &BlockReason{
 			Rule:    d.name,
-			Message: fmt.Sprintf("SQL injection pattern '%s' detected in URL path", pattern),
+			Message: "SQL injection detected in URL path",
 		}
 	}
 
 	// Check query parameters
 	for key, values := range r.URL.Query() {
 		for _, value := range values {
-			if matched, pattern := d.checkString(value); matched {
+			if matched, _ := d.checkString(value); matched {
 				return true, &BlockReason{
 					Rule:    d.name,
-					Message: fmt.Sprintf("SQL injection pattern '%s' detected in query parameter: %s", pattern, key),
+					Message: fmt.Sprintf("SQL injection detected in query parameter: %s", key),
 				}
 			}
 		}
@@ -89,10 +89,10 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 	// Check form parameters
 	for key, values := range r.Form {
 		for _, value := range values {
-			if matched, pattern := d.checkString(value); matched {
+			if matched, _ := d.checkString(value); matched {
 				return true, &BlockReason{
 					Rule:    d.name,
-					Message: fmt.Sprintf("SQL injection pattern '%s' detected in form parameter: %s", pattern, key),
+					Message: fmt.Sprintf("SQL injection detected in form parameter: %s", key),
 				}
 			}
 		}
@@ -100,10 +100,10 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 
 	// Check cookies
 	for _, cookie := range r.Cookies() {
-		if matched, pattern := d.checkString(cookie.Value); matched {
+		if matched, _ := d.checkString(cookie.Value); matched {
 			return true, &BlockReason{
 				Rule:    d.name,
-				Message: fmt.Sprintf("SQL injection pattern '%s' detected in cookie: %s", pattern, cookie.Name),
+				Message: fmt.Sprintf("SQL injection detected in cookie: %s", cookie.Name),
 			}
 		}
 	}
@@ -112,10 +112,10 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 	headersToCheck := []string{"User-Agent", "Referer", "X-Forwarded-For", "X-Real-IP", "Authorization"}
 	for _, header := range headersToCheck {
 		if value := r.Header.Get(header); value != "" {
-			if matched, pattern := d.checkString(value); matched {
+			if matched, _ := d.checkString(value); matched {
 				return true, &BlockReason{
 					Rule:    d.name,
-					Message: fmt.Sprintf("SQL injection pattern '%s' detected in header: %s", pattern, header),
+					Message: fmt.Sprintf("SQL injection detected in header: %s", header),
 				}
 			}
 		}

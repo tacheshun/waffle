@@ -1,19 +1,25 @@
 package limiter
 
 import (
+	"errors"
 	"net/http"
 	"sync"
 	"time"
 )
 
+// Common errors
+var (
+	ErrNilRequest = errors.New("nil request")
+)
+
 // RateLimiter defines the interface for rate limiters
 type RateLimiter interface {
 	// Check checks if the request exceeds the rate limit
-	// Returns (exceeded, wait time in seconds)
-	Check(*http.Request) (bool, int)
+	// Returns (exceeded, wait time in seconds, error)
+	Check(*http.Request) (bool, int, error)
 
 	// Reset resets the rate limit for the given request
-	Reset(*http.Request)
+	Reset(*http.Request) error
 }
 
 // MemoryRateLimiter implements a simple in-memory rate limiter
@@ -58,7 +64,11 @@ func NewMemoryRateLimiter(maxRequests int, periodSeconds int, keyFunc func(*http
 }
 
 // Check checks if the request exceeds the rate limit
-func (rl *MemoryRateLimiter) Check(r *http.Request) (bool, int) {
+func (rl *MemoryRateLimiter) Check(r *http.Request) (bool, int, error) {
+	if r == nil {
+		return false, 0, ErrNilRequest
+	}
+
 	key := rl.keyFunc(r)
 
 	rl.mu.Lock()
@@ -74,7 +84,7 @@ func (rl *MemoryRateLimiter) Check(r *http.Request) (bool, int) {
 			count:     1,
 			startTime: now,
 		}
-		return false, 0
+		return false, 0, nil
 	}
 
 	// Increment counter
@@ -87,20 +97,25 @@ func (rl *MemoryRateLimiter) Check(r *http.Request) (bool, int) {
 		if waitTime < 0 {
 			waitTime = 0
 		}
-		return true, waitTime
+		return true, waitTime, nil
 	}
 
-	return false, 0
+	return false, 0, nil
 }
 
 // Reset resets the rate limit for the given request
-func (rl *MemoryRateLimiter) Reset(r *http.Request) {
+func (rl *MemoryRateLimiter) Reset(r *http.Request) error {
+	if r == nil {
+		return ErrNilRequest
+	}
+
 	key := rl.keyFunc(r)
 
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
 	delete(rl.counters, key)
+	return nil
 }
 
 // IPRateLimiter creates a rate limiter that limits by IP address

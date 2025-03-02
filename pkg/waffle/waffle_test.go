@@ -182,12 +182,13 @@ type mockRateLimiter struct {
 	wait     int
 }
 
-func (rl *mockRateLimiter) Check(r *http.Request) (bool, int) {
-	return rl.exceeded, rl.wait
+func (rl *mockRateLimiter) Check(r *http.Request) (bool, int, error) {
+	return rl.exceeded, rl.wait, nil
 }
 
-func (rl *mockRateLimiter) Reset(r *http.Request) {
+func (rl *mockRateLimiter) Reset(r *http.Request) error {
 	// Do nothing
+	return nil
 }
 
 type mockLogger struct {
