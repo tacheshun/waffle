@@ -1,7 +1,7 @@
 package rules
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 )
@@ -50,7 +50,7 @@ func (r *RegexRule) Match(req *http.Request) (bool, *BlockReason) {
 		// In a production system, you'd need to handle this better
 		if req.Body != nil {
 			defer req.Body.Close()
-			bodyBytes, err := ioutil.ReadAll(req.Body)
+			bodyBytes, err := io.ReadAll(req.Body)
 			if err != nil {
 				return false, nil
 			}

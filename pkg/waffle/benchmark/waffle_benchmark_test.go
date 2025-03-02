@@ -1,7 +1,7 @@
 package benchmark
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +12,7 @@ import (
 
 func init() {
 	// Disable logging for benchmarks
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 }
 
 // BenchmarkWaffleNew benchmarks the creation of a new Waffle instance

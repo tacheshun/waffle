@@ -49,17 +49,6 @@ func (r *mockBenchRule) Name() string {
 	return r.name
 }
 
-// mockBenchLimiter is a simple rate limiter for benchmarking
-type mockBenchLimiter struct {
-	exceeded bool
-}
-
-func (l *mockBenchLimiter) Allow(r *http.Request) (bool, int) {
-	return l.exceeded, 60
-}
-
-func (l *mockBenchLimiter) UseXForwardedFor(use bool) {}
-
 // BenchmarkWaffleNew benchmarks creating a new Waffle instance
 func BenchmarkWaffleNew(b *testing.B) {
 	for i := 0; i < b.N; i++ {

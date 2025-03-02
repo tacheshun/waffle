@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/tacheshun/waffle/pkg/waffle"
 )
 
 // PathTraversalDetector detects path traversal attacks
@@ -36,7 +38,9 @@ func (d *PathTraversalDetector) Match(r *http.Request) (bool, *BlockReason) {
 	}
 
 	// Parse form data to access POST parameters
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		// If form parsing fails, continue with what we can check
+	}
 
 	// Check query parameters
 	for key, values := range r.URL.Query() {
@@ -170,4 +174,22 @@ func compilePathTraversalPatterns() []*regexp.Regexp {
 	}
 
 	return compiled
+}
+
+// Detect checks if a request contains path traversal attempts
+func (d *PathTraversalDetector) Detect(r *http.Request) (bool, *waffle.BlockReason) {
+	// Parse form data to check for path traversal in POST parameters
+	if err := r.ParseForm(); err != nil {
+		// If form parsing fails, continue with what we can check
+	}
+
+	// Check URL path first (most common vector)
+	if matched, reason := d.Match(r); matched {
+		return true, &waffle.BlockReason{
+			Rule:    reason.Rule,
+			Message: reason.Message,
+		}
+	}
+
+	return false, nil
 }

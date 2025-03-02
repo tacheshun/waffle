@@ -79,7 +79,10 @@ func TestMiddleware(t *testing.T) {
 			w := tt.setupWaffle()
 			nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 				rw.WriteHeader(http.StatusOK)
-				rw.Write([]byte("OK"))
+				_, err := rw.Write([]byte("OK"))
+				if err != nil {
+					t.Logf("Failed to write response: %v", err)
+				}
 			})
 			middleware := w.Middleware(nextHandler)
 
@@ -181,7 +184,10 @@ func TestHandlerFunc(t *testing.T) {
 			w := tt.setupWaffle()
 			nextHandler := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 				rw.WriteHeader(http.StatusOK)
-				rw.Write([]byte("OK"))
+				_, err := rw.Write([]byte("OK"))
+				if err != nil {
+					t.Logf("Failed to write response: %v", err)
+				}
 			})
 			handlerFunc := w.HandlerFunc(nextHandler)
 

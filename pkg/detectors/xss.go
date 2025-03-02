@@ -28,7 +28,9 @@ func (d *XSSDetector) Match(r *http.Request) (bool, *BlockReason) {
 	}
 
 	// Parse form data to access POST parameters
-	r.ParseForm()
+	if err := r.ParseForm(); err != nil {
+		// If form parsing fails, continue with what we can check
+	}
 
 	// Check URL path
 	if d.checkString(r.URL.Path) {

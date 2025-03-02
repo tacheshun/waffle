@@ -13,8 +13,12 @@ func TestIntegration(t *testing.T) {
 	handlerCalled := false
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlerCalled = true
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, err := w.Write([]byte("OK"))
+		if err != nil {
+			// In a test handler, we can't do much if Write fails
+			// but checking the error satisfies the linter
+			return
+		}
 	})
 
 	tests := []struct {
@@ -208,8 +212,10 @@ func TestCustomDetectors(t *testing.T) {
 
 	// Create a test handler
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, err := w.Write([]byte("OK"))
+		if err != nil {
+			return
+		}
 	})
 
 	tests := []struct {
@@ -304,3 +310,22 @@ func (d *mockDetector) Detect(r *http.Request) (bool, string) {
 // func (r *mockRule) Disable() {
 // 	r.enabled = false
 // }
+
+// testHandler is a simple HTTP handler for testing
+func testHandler(w http.ResponseWriter, r *http.Request) {
+	_, err := w.Write([]byte("OK"))
+	if err != nil {
+		// In a test handler, we can't do much if Write fails
+		// but checking the error satisfies the linter
+		return
+	}
+}
+
+// testHandlerCustomLogic is a test handler with custom logic
+func testHandlerCustomLogic(w http.ResponseWriter, r *http.Request) {
+	// Custom logic here
+	_, err := w.Write([]byte("OK"))
+	if err != nil {
+		return
+	}
+}

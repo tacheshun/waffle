@@ -95,12 +95,3 @@ func TestDefaultLogger(t *testing.T) {
 
 	// If we got here without panicking, the test passes
 }
-
-// testError is a simple error implementation for testing
-type testError struct {
-	message string
-}
-
-func (e *testError) Error() string {
-	return e.message
-}

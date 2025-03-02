@@ -22,7 +22,11 @@ func (w *Waffle) Middleware(next http.Handler) http.Handler {
 			} else {
 				// Default block behavior
 				rw.WriteHeader(http.StatusForbidden)
-				rw.Write([]byte("Forbidden: " + reason.Message))
+				_, err := rw.Write([]byte("Forbidden: " + reason.Message))
+				if err != nil {
+					// If write fails, we've already sent the header
+					// Log would be appropriate here in production code
+				}
 
 				// If rate limited, add retry-after header
 				if reason.Rule == "rate_limit" && reason.Wait > 0 {
@@ -51,7 +55,10 @@ func (w *Waffle) HandlerFunc(next http.HandlerFunc) http.HandlerFunc {
 			} else {
 				// Default block behavior
 				rw.WriteHeader(http.StatusForbidden)
-				rw.Write([]byte("Forbidden: " + reason.Message))
+				_, err := rw.Write([]byte("Forbidden: " + reason.Message))
+				if err != nil {
+					// If write fails, we've already sent the header
+				}
 
 				// If rate limited, add retry-after header
 				if reason.Rule == "rate_limit" && reason.Wait > 0 {

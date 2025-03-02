@@ -108,7 +108,9 @@ func TestSQLInjectionDetector_Detect(t *testing.T) {
 
 			// For POST requests, we need to parse the form
 			if tt.method == "POST" {
-				req.ParseForm()
+				if err := req.ParseForm(); err != nil {
+					t.Fatalf("Failed to parse form: %v", err)
+				}
 			}
 
 			// Test the detection
@@ -228,7 +230,9 @@ func TestXSSDetector_Detect(t *testing.T) {
 
 			// For POST requests, we need to parse the form
 			if tt.method == "POST" {
-				req.ParseForm()
+				if err := req.ParseForm(); err != nil {
+					t.Fatalf("Failed to parse form: %v", err)
+				}
 			}
 
 			// Test the detection

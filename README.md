@@ -191,6 +191,7 @@ For more advanced configuration options, see the [API Documentation](docs/api_do
 - [Deployment Guide](docs/deployment_guide.md): Instructions for deploying Waffle in various environments.
 - [Project Outline](docs/project_outline.md): Overview of the project structure and components.
 - [Rules Documentation](docs/rules.md): Information about the default rules and how to create custom rules.
+- [Architecture Flow](flow.md): System architecture diagrams showing how Waffle integrates with applications.
 
 ## Examples
 
