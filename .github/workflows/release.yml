@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write  # This is required for creating releases
+  packages: write  # This is required if you publish to GitHub Packages
+
 jobs:
   goreleaser:
     name: Release
@@ -76,5 +80,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ./waffle-${{ env.VERSION }}-${{ matrix.goos }}-${{ matrix.goarch }}*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          token: ${{ secrets.GITHUB_TOKEN }} 
