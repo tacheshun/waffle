@@ -394,6 +394,12 @@ func TestLoadBalancerHealthCheck(t *testing.T) {
 		}
 	}
 
+	// Stop health checks before accessing the health checker directly
+	lb.StopHealthCheck()
+
+	// Give time for goroutines to clean up
+	time.Sleep(100 * time.Millisecond)
+
 	// Test direct health check methods
 	healthCheck := lb.healthCheck.(*HTTPHealthCheck)
 
@@ -412,18 +418,21 @@ func TestLoadBalancerHealthCheck(t *testing.T) {
 	if len(healthyBackends) != 1 {
 		t.Errorf("Expected 1 healthy backend, got %d", len(healthyBackends))
 	}
-
-	// Stop health checks
-	lb.StopHealthCheck()
 }
 
 func TestHTTPHealthCheck(t *testing.T) {
 	// Create a test server that alternates between healthy and unhealthy
+	var serverMu sync.Mutex
 	healthyRequests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/health" {
+			serverMu.Lock()
+			currentRequest := healthyRequests
+			healthyRequests++
+			serverMu.Unlock()
+
 			// Alternate between healthy and unhealthy responses
-			if healthyRequests%2 == 0 {
+			if currentRequest%2 == 0 {
 				w.WriteHeader(http.StatusOK)
 				_, err := w.Write([]byte("healthy"))
 				if err != nil {
@@ -436,7 +445,6 @@ func TestHTTPHealthCheck(t *testing.T) {
 					t.Errorf("Failed to write response: %v", err)
 				}
 			}
-			healthyRequests++
 		}
 	}))
 	defer server.Close()
@@ -453,24 +461,38 @@ func TestHTTPHealthCheck(t *testing.T) {
 	// Add backend
 	healthCheck.AddBackend(backend)
 
-	// Track state changes
+	// Track state changes with proper synchronization
+	var stateChangeMu sync.Mutex
 	stateChanges := 0
 	healthCheck.SetOnStateChange(func(backend *url.URL, healthy bool) {
+		stateChangeMu.Lock()
 		stateChanges++
+		stateChangeMu.Unlock()
 	})
 
 	// Start health checks
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	healthCheck.Start(ctx)
 
 	// Wait for multiple health checks to run
 	time.Sleep(500 * time.Millisecond)
 
+	// Check state changes with proper synchronization
+	stateChangeMu.Lock()
+	changes := stateChanges
+	stateChangeMu.Unlock()
+
 	// We should have seen at least one state change
-	if stateChanges == 0 {
+	if changes == 0 {
 		t.Errorf("Expected state changes, got none")
 	}
+
+	// Stop health checks before making any more assertions
+	healthCheck.Stop()
+	cancel()
+
+	// Give time for goroutines to clean up
+	time.Sleep(100 * time.Millisecond)
 
 	// Test removing backend
 	if !healthCheck.RemoveBackend(backend) {
@@ -482,9 +504,6 @@ func TestHTTPHealthCheck(t *testing.T) {
 	if healthCheck.RemoveBackend(nonExistentBackend) {
 		t.Errorf("Unexpectedly removed non-existent backend")
 	}
-
-	// Stop health checks
-	healthCheck.Stop()
 }
 
 func TestLoadBalancerWithoutHealthCheck(t *testing.T) {
