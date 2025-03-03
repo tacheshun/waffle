@@ -25,7 +25,7 @@ func TestProxyBasic(t *testing.T) {
 	// Create a test backend server
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Backend response"))
+		_, _ = w.Write([]byte("Backend response"))
 	}))
 	defer backendServer.Close()
 
@@ -57,7 +57,7 @@ func TestProxyBasic(t *testing.T) {
 				}
 			}
 			w.WriteHeader(resp.StatusCode)
-			io.Copy(w, resp.Body)
+			_, _ = io.Copy(w, resp.Body)
 		})
 
 		// Process the request
@@ -110,7 +110,7 @@ func TestProxyWithTLS(t *testing.T) {
 	// Create a test backend server
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("TLS Backend response"))
+		_, _ = w.Write([]byte("TLS Backend response"))
 	}))
 	defer backendServer.Close()
 
@@ -152,7 +152,7 @@ func TestProxyWithTLS(t *testing.T) {
 				}
 			}
 			w.WriteHeader(resp.StatusCode)
-			io.Copy(w, resp.Body)
+			_, _ = io.Copy(w, resp.Body)
 		})
 
 		// Process the request
@@ -218,10 +218,10 @@ func TestTLSCertificateValidation(t *testing.T) {
 
 	// Test with valid certificates
 	proxyOpts := ProxyOptions{
-		ListenAddr: ":8443",
-		BackendURL: "http://example.com",
-		TLSCert:    certFile,
-		TLSKey:     keyFile,
+		ListenAddr:  ":8443",
+		BackendURLs: []string{"http://example.com"},
+		TLSCert:     certFile,
+		TLSKey:      keyFile,
 	}
 
 	// Validate TLS configuration
@@ -358,16 +358,16 @@ func TestProxyTLSConfiguration(t *testing.T) {
 	// Create a test HTTP server to use as a backend
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Backend response"))
+		_, _ = w.Write([]byte("Backend response"))
 	}))
 	defer backendServer.Close()
 
 	// Create a proxy options with TLS
 	proxyOpts := ProxyOptions{
-		ListenAddr: ":0", // Use a random port
-		BackendURL: backendServer.URL,
-		TLSCert:    certFile,
-		TLSKey:     keyFile,
+		ListenAddr:  ":0", // Use a random port
+		BackendURLs: []string{backendServer.URL},
+		TLSCert:     certFile,
+		TLSKey:      keyFile,
 	}
 
 	// Create a channel to signal when the server is ready
@@ -380,7 +380,7 @@ func TestProxyTLSConfiguration(t *testing.T) {
 	// Start the proxy in a goroutine
 	go func() {
 		// Create a custom server that we can control
-		target, err := url.Parse(proxyOpts.BackendURL)
+		target, err := url.Parse(proxyOpts.BackendURLs[0])
 		if err != nil {
 			errChan <- fmt.Errorf("invalid backend URL: %v", err)
 			return
@@ -454,16 +454,16 @@ func TestProxyTLSCertificateLoading(t *testing.T) {
 	// Create a test HTTP server to use as a backend
 	backendServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Backend response"))
+		_, _ = w.Write([]byte("Backend response"))
 	}))
 	defer backendServer.Close()
 
 	// Test loading valid certificates
 	validOpts := ProxyOptions{
-		ListenAddr: ":0",
-		BackendURL: backendServer.URL,
-		TLSCert:    certFile,
-		TLSKey:     keyFile,
+		ListenAddr:  ":0",
+		BackendURLs: []string{backendServer.URL},
+		TLSCert:     certFile,
+		TLSKey:      keyFile,
 	}
 
 	// Verify that the TLS configuration is valid
@@ -474,10 +474,10 @@ func TestProxyTLSCertificateLoading(t *testing.T) {
 	// Test with invalid certificate path
 	invalidCertFile := filepath.Join(tempDir, "nonexistent.pem")
 	invalidOpts := ProxyOptions{
-		ListenAddr: ":0",
-		BackendURL: backendServer.URL,
-		TLSCert:    invalidCertFile,
-		TLSKey:     keyFile,
+		ListenAddr:  ":0",
+		BackendURLs: []string{backendServer.URL},
+		TLSCert:     invalidCertFile,
+		TLSKey:      keyFile,
 	}
 
 	// Verify that the TLS configuration is invalid
@@ -488,10 +488,10 @@ func TestProxyTLSCertificateLoading(t *testing.T) {
 	// Test with invalid key path
 	invalidKeyFile := filepath.Join(tempDir, "nonexistent.key")
 	invalidOpts = ProxyOptions{
-		ListenAddr: ":0",
-		BackendURL: backendServer.URL,
-		TLSCert:    certFile,
-		TLSKey:     invalidKeyFile,
+		ListenAddr:  ":0",
+		BackendURLs: []string{backendServer.URL},
+		TLSCert:     certFile,
+		TLSKey:      invalidKeyFile,
 	}
 
 	// Verify that the TLS configuration is invalid
@@ -501,10 +501,10 @@ func TestProxyTLSCertificateLoading(t *testing.T) {
 
 	// Test with empty certificate paths
 	emptyOpts := ProxyOptions{
-		ListenAddr: ":0",
-		BackendURL: backendServer.URL,
-		TLSCert:    "",
-		TLSKey:     "",
+		ListenAddr:  ":0",
+		BackendURLs: []string{backendServer.URL},
+		TLSCert:     "",
+		TLSKey:      "",
 	}
 
 	// Verify that the TLS configuration is invalid

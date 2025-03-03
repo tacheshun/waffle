@@ -277,40 +277,6 @@ func (d *mockDetector) Detect(r *http.Request) (bool, string) {
 	return d.shouldDetect, d.reason
 }
 
-// Enhanced mockRule for more flexible testing
-// type mockRule struct {
-// 	enabled bool
-// 	match   interface{} // Can be bool or func(*http.Request) bool
-// 	reason  *BlockReason
-// }
-
-// func (r *mockRule) Match(req *http.Request) (bool, *BlockReason) {
-// 	if matchFunc, ok := r.match.(func(*http.Request) bool); ok {
-// 		if matchFunc(req) {
-// 			return true, r.reason
-// 		}
-// 		return false, nil
-// 	}
-//
-// 	if matchBool, ok := r.match.(bool); ok {
-// 		return matchBool, r.reason
-// 	}
-//
-// 	return false, nil
-// }
-
-// func (r *mockRule) IsEnabled() bool {
-// 	return r.enabled
-// }
-
-// func (r *mockRule) Enable() {
-// 	r.enabled = true
-// }
-
-// func (r *mockRule) Disable() {
-// 	r.enabled = false
-// }
-
 // TestHandlerFunctions tests the handler functions used in integration tests
 func TestHandlerFunctions(t *testing.T) {
 	// Test testHandler

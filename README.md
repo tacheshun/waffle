@@ -20,6 +20,14 @@ Waffle inspects HTTP requests, blocks common attack patterns (SQLi, XSS, command
 - **Logging and Alerting**: Detailed logging of attacks and suspicious activity.
 - **High Performance**: Optimized for minimal impact on application performance.
 - **Easy Configuration**: Simple API and configuration options.
+- **Web Application Firewall (WAF)**: Protects against common web attacks
+- **Rate Limiting**: Prevents abuse by limiting request rates
+- **Custom Rules**: Define your own security rules
+- **Proxy Mode**: Run as a reverse proxy in front of your application
+- **TLS Termination**: Handle HTTPS connections with TLS certificates
+- **Load Balancing**: Distribute traffic across multiple backend servers
+- **Health Checking**: Automatically detect and route around unhealthy backend servers
+- **Middleware Support**: Integrate with popular Go web frameworks
 
 ## Installation
 
@@ -144,14 +152,26 @@ func main() {
 Run Waffle as a reverse proxy in front of your web service:
 
 ```bash
-# Run with default options
-./waffle -listen :8080 -backend http://myapp:3000
+# Basic usage with a single backend
+waffle -listen :8080 -backends http://localhost:3000
 
-# Run with a configuration file
-./waffle -config config.yaml
+# With multiple backends and round-robin load balancing
+waffle -listen :8080 -backends http://app1:3000,http://app2:3000 -lb-strategy round-robin
 
-# Run with TLS termination
-./waffle -listen :443 -backend http://myapp:3000 -tls-cert /path/to/cert.pem -tls-key /path/to/key.pem
+# With IP-based load balancing
+waffle -listen :8080 -backends http://app1:3000,http://app2:3000 -lb-strategy ip-hash
+
+# With least connections load balancing
+waffle -listen :8080 -backends http://app1:3000,http://app2:3000 -lb-strategy least-connections
+
+# With TLS termination
+waffle -listen :443 -backends http://localhost:3000 -tls-cert /path/to/cert.pem -tls-key /path/to/key.pem
+
+# With health checking
+waffle -listen :8080 -lb-backend http://app1:3000 -lb-backend http://app2:3000 -health-check-path /health -health-check-interval 5s
+
+# Disable health checking
+waffle -listen :8080 -lb-backend http://app1:3000 -lb-backend http://app2:3000 -disable-health-check
 ```
 
 Example configuration file (config.yaml):
@@ -193,12 +213,12 @@ For more advanced configuration options, see the [API Documentation](docs/api_do
 
 ## Documentation
 
-- [API Documentation](docs/api_documentation.md): Detailed API reference and usage examples.
-- [Deployment Guide](docs/deployment_guide.md): Instructions for deploying Waffle in various environments.
-- [Project Outline](docs/project_outline.md): Overview of the project structure and components.
-- [Rules Documentation](docs/rules.md): Information about the default rules and how to create custom rules.
-- [Architecture Flow](docs/flow.md): System architecture diagrams showing how Waffle integrates with applications.
-- [Certificate Management](docs/certificates.md): Guidelines for managing TLS certificates securely.
+- [Getting Started](docs/getting_started.md)
+- [Configuration](docs/configuration.md)
+- [Custom Rules](docs/custom_rules.md)
+- [API Reference](docs/api.md)
+- [TLS Certificates](docs/certificates.md)
+- [Load Balancing](docs/load_balancing.md)
 
 ## Examples
 
@@ -277,3 +297,46 @@ To create a new release:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE.md file for details.
+
+## Load Balancing
+
+Waffle includes a powerful load balancing feature that allows you to distribute traffic across multiple backend servers. This can improve reliability, performance, and scalability of your applications.
+
+### Load Balancing Strategies
+
+Waffle supports three load balancing strategies:
+
+1. **Round Robin (Default)**: Distributes requests sequentially across all available backend servers in a circular order.
+2. **IP Hash**: Uses the client's IP address to determine which backend server should handle the request, ensuring session persistence.
+3. **Least Connections**: Routes requests to the backend server with the fewest active connections.
+
+### Example
+
+```bash
+# Run with multiple backends and round-robin load balancing
+waffle -listen :8080 -backends http://app1:3000,http://app2:3000 -lb-strategy round-robin
+```
+
+For more details, see the [Load Balancing documentation](docs/load_balancing.md).
+
+## Health Checking
+
+Waffle includes a health checking system that automatically detects and routes around unhealthy backend servers. This ensures that your application remains available even if some backend servers are experiencing issues.
+
+### Health Check Features
+
+- **HTTP Health Checks**: Periodically sends HTTP requests to backend servers to verify their health
+- **Automatic Failover**: Routes traffic away from unhealthy servers
+- **Configurable Paths**: Customize the health check endpoint path
+- **Adjustable Intervals**: Set how frequently health checks are performed
+- **Timeout Control**: Configure how long to wait for health check responses
+- **State Change Notifications**: Logs when backends change between healthy and unhealthy states
+
+### Example
+
+```bash
+# Run with health checking enabled
+waffle -listen :8080 -lb-backend http://app1:3000 -lb-backend http://app2:3000 -health-check-path /health -health-check-interval 5s -health-check-timeout 2s
+```
+
+For more details, see the [Health Checking documentation](docs/health_checking.md).
