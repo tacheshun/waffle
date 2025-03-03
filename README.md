@@ -277,30 +277,6 @@ make setup
 make lint
 ```
 
-### Creating Releases
-
-To create a new release:
-
-1. Tag the repository with a semantic version:
-   ```bash
-   git tag -a v0.1.0 -m "First release"
-   git push origin v0.1.0
-   ```
-
-2. This will trigger the GitHub Actions release workflow, which:
-   - Builds binaries for multiple platforms (Linux, macOS, Windows)
-   - Creates a GitHub release with the binaries attached
-   - Generates release notes from commit messages
-
-3. Alternatively, you can build release binaries locally:
-   ```bash
-   make release
-   ```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE.md file for details.
-
 ## Load Balancing
 
 Waffle includes a powerful load balancing feature that allows you to distribute traffic across multiple backend servers. This can improve reliability, performance, and scalability of your applications.
@@ -343,3 +319,7 @@ waffle -listen :8080 -lb-backend http://app1:3000 -lb-backend http://app2:3000 -
 ```
 
 For more details, see the [Health Checking documentation](docs/health_checking.md).
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE.md file for details. 
