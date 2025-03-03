@@ -439,4 +439,4 @@ If you encounter issues not covered in this guide, you can:
 
 - Check the [GitHub repository](https://github.com/tacheshun/waffle) for known issues
 - Open a new issue on GitHub
-- Contact the maintainers at support@example.com 
+- Contact the maintainers at marius.costache.b@gmail.com 
