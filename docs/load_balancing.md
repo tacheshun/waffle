@@ -61,7 +61,25 @@ waffle -backends http://app1:3000,http://app2:3000 -lb-strategy ip-hash -config 
 
 ## Health Checks and Failover
 
-Currently, Waffle does not include automatic health checks or failover capabilities. If a backend server becomes unavailable, requests to that server may fail. Future versions of Waffle may include these features.
+Waffle includes robust automatic health checks and failover capabilities. The system periodically checks the health of all backend servers and automatically routes traffic only to healthy backends. If a backend server becomes unavailable, Waffle will detect this through its health checking mechanism and stop sending requests to that server until it recovers.
+
+Key features:
+- Configurable health check endpoints (default: `/health`)
+- Adjustable check intervals and timeouts
+- Automatic failover to healthy backends
+- Automatic recovery when backends return to healthy state
+
+For detailed information on health checking, see [Health Checking Documentation](health_checking.md).
+
+Example with health checking:
+```bash
+waffle -listen :8080 -lb-backend http://app1:3000 -lb-backend http://app2:3000 -health-check-path /health -health-check-interval 5s
+```
+
+To disable health checking:
+```bash
+waffle -listen :8080 -lb-backend http://app1:3000 -lb-backend http://app2:3000 -disable-health-check
+```
 
 ## Best Practices
 
@@ -73,10 +91,11 @@ Currently, Waffle does not include automatic health checks or failover capabilit
 
 4. **Scaling**: Add or remove backend servers as needed to handle changes in traffic volume.
 
+5. **Health Check Endpoints**: Implement proper health check endpoints on all backend servers that accurately reflect the health of the service.
+
 ## Limitations
 
 - Waffle does not currently support weighted load balancing.
-- Health checks and automatic failover are not currently supported.
 - Sticky sessions based on cookies are not currently supported.
 
 These features may be added in future versions of Waffle. 
