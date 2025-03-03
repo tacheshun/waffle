@@ -103,6 +103,7 @@ Standalone reverse proxy implementation:
 - **HTTP Proxy**: Forward requests to backend services
 - **TLS Termination**: Handle HTTPS connections
 - **Load Balancing**: Distribute requests across multiple backends
+- **Health Checking**: Automatically detect and route around unhealthy backend servers
 
 ### 7. Telemetry (internal/telemetry)
 

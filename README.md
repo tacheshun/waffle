@@ -216,9 +216,12 @@ For more advanced configuration options, see the [API Documentation](docs/api_do
 - [Getting Started](docs/getting_started.md)
 - [Configuration](docs/configuration.md)
 - [Custom Rules](docs/custom_rules.md)
-- [API Reference](docs/api.md)
+- [Middleware Integration](docs/middleware.md)
+- [Proxy Mode](docs/proxy.md)
+- [API Reference](docs/api_documentation.md)
 - [TLS Certificates](docs/certificates.md)
 - [Load Balancing](docs/load_balancing.md)
+- [Health Checking](docs/health_checking.md)
 
 ## Examples
 
