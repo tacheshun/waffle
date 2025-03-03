@@ -5,7 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Build Status](https://github.com/tacheshun/waffle/workflows/Go/badge.svg)](https://github.com/tacheshun/waffle/actions)
 
-Waffle is a lightweight Web Application Firewall (WAF) written in Go, designed to protect your web applications from common attacks.
+Waffle is an open-source Lightweight Web Application Firewall (WAF) written in Go, designed to protect your web applications from common attacks.
 
 ## Description
 
@@ -13,21 +13,18 @@ Waffle inspects HTTP requests, blocks common attack patterns (SQLi, XSS, command
 
 ## Key Features
 
-- **Multiple Integration Options**: Use as middleware for Go web frameworks (net/http, Gin, Echo) or as a standalone reverse proxy.
-- **Comprehensive Protection**: Defends against SQL injection, XSS, command injection, path traversal, and more.
-- **Rule-Based Filtering**: Flexible rule system with regex patterns and pre-defined signatures.
+- **Web Application Firewall (WAF)**: Defends against SQL injection, XSS, command injection, path traversal, and  common web attacks
 - **Rate Limiting**: Prevents DoS attacks by limiting request frequency.
 - **Logging and Alerting**: Detailed logging of attacks and suspicious activity.
 - **High Performance**: Optimized for minimal impact on application performance.
 - **Easy Configuration**: Simple API and configuration options.
-- **Web Application Firewall (WAF)**: Protects against common web attacks
-- **Rate Limiting**: Prevents abuse by limiting request rates
+- **Rule-Based Filtering**: Flexible rule system with regex patterns and pre-defined signatures.
 - **Custom Rules**: Define your own security rules
 - **Proxy Mode**: Run as a reverse proxy in front of your application
 - **TLS Termination**: Handle HTTPS connections with TLS certificates
 - **Load Balancing**: Distribute traffic across multiple backend servers
 - **Health Checking**: Automatically detect and route around unhealthy backend servers
-- **Middleware Support**: Integrate with popular Go web frameworks
+- **Multiple Integration Options**: Use as middleware for Go web frameworks (net/http, Gin, Echo) or as a standalone reverse proxy.
 
 ## Installation
 
