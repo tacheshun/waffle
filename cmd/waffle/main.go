@@ -1,17 +1,10 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/tacheshun/waffle/internal/version"
 	"github.com/tacheshun/waffle/pkg/waffle"
@@ -23,6 +16,11 @@ func main() {
 	backendURL := flag.String("backend", "", "Backend server URL")
 	configFile := flag.String("config", "", "Path to configuration file")
 	showVersion := flag.Bool("version", false, "Show version information and exit")
+
+	// Add TLS options
+	tlsCert := flag.String("tls-cert", "", "Path to TLS certificate file")
+	tlsKey := flag.String("tls-key", "", "Path to TLS private key file")
+
 	flag.Parse()
 
 	// Show version and exit if requested
@@ -34,21 +32,38 @@ func main() {
 	// Check if backend URL is provided
 	if *backendURL == "" {
 		fmt.Fprintf(os.Stderr, "Error: Backend URL is required\n")
-		fmt.Fprintf(os.Stderr, "Usage: waffle -listen :8080 -backend http://myapp:3000 [-config config.yaml]\n")
+		fmt.Fprintf(os.Stderr, "Usage: waffle -listen :8080 -backend http://myapp:3000 [-config config.yaml] [-tls-cert cert.pem -tls-key key.pem]\n")
 		os.Exit(1)
 	}
 
-	// Parse backend URL
-	target, err := url.Parse(*backendURL)
-	if err != nil {
-		log.Fatalf("Invalid backend URL %q: %v", *backendURL, err)
+	// Validate TLS configuration
+	if (*tlsCert != "" && *tlsKey == "") || (*tlsCert == "" && *tlsKey != "") {
+		fmt.Fprintf(os.Stderr, "Error: Both TLS certificate and key must be provided together\n")
+		os.Exit(1)
 	}
 
-	// Create reverse proxy
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	if *tlsCert != "" && *tlsKey != "" {
+		// Check if certificate and key files exist
+		if _, err := os.Stat(*tlsCert); os.IsNotExist(err) {
+			log.Fatalf("TLS certificate file %q does not exist: %v", *tlsCert, err)
+		}
+		if _, err := os.Stat(*tlsKey); os.IsNotExist(err) {
+			log.Fatalf("TLS key file %q does not exist: %v", *tlsKey, err)
+		}
+	}
 
-	// Initialize WAF
-	var waf *waffle.Waffle
+	// Print startup banner
+	fmt.Printf("Starting %s\n", version.BuildInfo())
+
+	// Create proxy options
+	proxyOpts := waffle.ProxyOptions{
+		ListenAddr: *listenAddr,
+		BackendURL: *backendURL,
+		TLSCert:    *tlsCert,
+		TLSKey:     *tlsKey,
+	}
+
+	// Add WAF options based on config file if provided
 	if *configFile != "" {
 		// Check if config file exists
 		if _, err := os.Stat(*configFile); os.IsNotExist(err) {
@@ -56,51 +71,11 @@ func main() {
 		}
 
 		fmt.Printf("Loading configuration from %s\n", *configFile)
-		// TODO: Load configuration from file
-		waf = waffle.New() // Placeholder, will be replaced with config loading
-	} else {
-		// Use default configuration
-		waf = waffle.New()
+		// TODO: Load configuration from file and add to proxyOpts.WafOptions
 	}
 
-	// Create handler with WAF middleware
-	handler := waf.Middleware(proxy)
-
-	// Create server
-	server := &http.Server{
-		Addr:    *listenAddr,
-		Handler: handler,
+	// Run the proxy
+	if err := waffle.RunProxy(proxyOpts); err != nil {
+		log.Fatalf("Proxy error: %v", err)
 	}
-
-	// Set up graceful shutdown
-	done := make(chan bool, 1)
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	// Print startup banner
-	fmt.Printf("Starting %s\n", version.BuildInfo())
-	fmt.Printf("Listening on %s, proxying to %s\n", *listenAddr, *backendURL)
-
-	// Start server in a goroutine
-	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
-		}
-	}()
-
-	// Wait for shutdown signal
-	<-quit
-	log.Println("Server is shutting down...")
-
-	// Create context with timeout for graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Attempt graceful shutdown
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
-	}
-
-	log.Println("Server exited gracefully")
-	close(done)
 }

@@ -13,6 +13,8 @@ type Options struct {
 	logger          Logger
 	logAllRequests  bool               // Whether to log all requests, not just attacks
 	blockHandler    func(*BlockReason) // Custom handler for blocked requests
+	tlsCertFile     string             // Path to TLS certificate file
+	tlsKeyFile      string             // Path to TLS private key file
 }
 
 // Option is a function that configures a Waffle instance
@@ -26,6 +28,8 @@ func defaultOptions() *Options {
 		logger:          &defaultLogger{},
 		logAllRequests:  false,
 		blockHandler:    nil,
+		tlsCertFile:     "",
+		tlsKeyFile:      "",
 	}
 }
 
@@ -61,6 +65,14 @@ func WithBlockHandler(handler func(*BlockReason)) Option {
 func WithLogAllRequests(logAll bool) Option {
 	return func(o *Options) {
 		o.logAllRequests = logAll
+	}
+}
+
+// WithTLS sets the TLS certificate and key files
+func WithTLS(certFile, keyFile string) Option {
+	return func(o *Options) {
+		o.tlsCertFile = certFile
+		o.tlsKeyFile = keyFile
 	}
 }
 

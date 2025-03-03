@@ -36,3 +36,5 @@ Thumbs.db
 
 # Go workspace file
 go.work 
+# TLS Certificates
+certs/

@@ -149,6 +149,9 @@ Run Waffle as a reverse proxy in front of your web service:
 
 # Run with a configuration file
 ./waffle -config config.yaml
+
+# Run with TLS termination
+./waffle -listen :443 -backend http://myapp:3000 -tls-cert /path/to/cert.pem -tls-key /path/to/key.pem
 ```
 
 Example configuration file (config.yaml):
@@ -156,6 +159,9 @@ Example configuration file (config.yaml):
 ```yaml
 listen: :8080
 backend: http://myapp:3000
+tls:
+  cert_file: /path/to/cert.pem
+  key_file: /path/to/key.pem
 rules:
   sqli: true
   xss: true
@@ -192,6 +198,7 @@ For more advanced configuration options, see the [API Documentation](docs/api_do
 - [Project Outline](docs/project_outline.md): Overview of the project structure and components.
 - [Rules Documentation](docs/rules.md): Information about the default rules and how to create custom rules.
 - [Architecture Flow](docs/flow.md): System architecture diagrams showing how Waffle integrates with applications.
+- [Certificate Management](docs/certificates.md): Guidelines for managing TLS certificates securely.
 
 ## Examples
 

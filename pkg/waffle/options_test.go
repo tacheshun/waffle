@@ -1,6 +1,8 @@
 package waffle
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -31,6 +33,29 @@ func TestDefaultOptions(t *testing.T) {
 	// Default block handler should be nil
 	if opts.blockHandler != nil {
 		t.Errorf("Expected blockHandler to be nil, got non-nil value")
+	}
+
+	// Verify default values
+	if !opts.useDefaultRules {
+		t.Error("Expected useDefaultRules to be true by default")
+	}
+	if opts.limiter != nil {
+		t.Error("Expected limiter to be nil by default")
+	}
+	if opts.logger == nil {
+		t.Error("Expected logger to be non-nil by default")
+	}
+	if opts.logAllRequests {
+		t.Error("Expected logAllRequests to be false by default")
+	}
+	if opts.blockHandler != nil {
+		t.Error("Expected blockHandler to be nil by default")
+	}
+	if opts.tlsCertFile != "" {
+		t.Errorf("Expected tlsCertFile to be empty by default, got %q", opts.tlsCertFile)
+	}
+	if opts.tlsKeyFile != "" {
+		t.Errorf("Expected tlsKeyFile to be empty by default, got %q", opts.tlsKeyFile)
 	}
 }
 
@@ -98,5 +123,75 @@ func TestWithBlockHandler(t *testing.T) {
 	opts.blockHandler(&BlockReason{})
 	if !called {
 		t.Errorf("Expected block handler to be called")
+	}
+}
+
+func TestWithTLS(t *testing.T) {
+	// Create options with default values
+	opts := defaultOptions()
+
+	// Verify default values
+	if opts.tlsCertFile != "" || opts.tlsKeyFile != "" {
+		t.Errorf("Expected empty TLS files by default, got cert=%q, key=%q", opts.tlsCertFile, opts.tlsKeyFile)
+	}
+
+	// Apply TLS option
+	certFile := "/path/to/cert.pem"
+	keyFile := "/path/to/key.pem"
+	WithTLS(certFile, keyFile)(opts)
+
+	// Verify values were set correctly
+	if opts.tlsCertFile != certFile {
+		t.Errorf("Expected tlsCertFile=%q, got %q", certFile, opts.tlsCertFile)
+	}
+	if opts.tlsKeyFile != keyFile {
+		t.Errorf("Expected tlsKeyFile=%q, got %q", keyFile, opts.tlsKeyFile)
+	}
+}
+
+func TestTLSCertificateLoading(t *testing.T) {
+	// Create temporary directory for test certificates
+	tempDir, err := os.MkdirTemp("", "waffle-tls-options-test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create test certificate files
+	certFile := filepath.Join(tempDir, "cert.pem")
+	keyFile := filepath.Join(tempDir, "key.pem")
+
+	// Create dummy certificate files
+	if err := os.WriteFile(certFile, []byte("TEST CERTIFICATE"), 0600); err != nil {
+		t.Fatalf("Failed to write test certificate: %v", err)
+	}
+	if err := os.WriteFile(keyFile, []byte("TEST PRIVATE KEY"), 0600); err != nil {
+		t.Fatalf("Failed to write test key: %v", err)
+	}
+
+	// Create a Waffle instance with TLS options
+	waf := New(WithTLS(certFile, keyFile))
+
+	// Check if the TLS options were set correctly
+	opts := waf.options
+	if opts.tlsCertFile != certFile {
+		t.Errorf("Expected tlsCertFile=%q, got %q", certFile, opts.tlsCertFile)
+	}
+	if opts.tlsKeyFile != keyFile {
+		t.Errorf("Expected tlsKeyFile=%q, got %q", keyFile, opts.tlsKeyFile)
+	}
+
+	// Test with non-existent files
+	nonExistentCert := filepath.Join(tempDir, "nonexistent.pem")
+	nonExistentKey := filepath.Join(tempDir, "nonexistent.key")
+
+	// This should still set the options, but validation would happen when starting the server
+	waf = New(WithTLS(nonExistentCert, nonExistentKey))
+	opts = waf.options
+	if opts.tlsCertFile != nonExistentCert {
+		t.Errorf("Expected tlsCertFile=%q, got %q", nonExistentCert, opts.tlsCertFile)
+	}
+	if opts.tlsKeyFile != nonExistentKey {
+		t.Errorf("Expected tlsKeyFile=%q, got %q", nonExistentKey, opts.tlsKeyFile)
 	}
 }
