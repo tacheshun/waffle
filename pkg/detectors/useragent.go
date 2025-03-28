@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 // UserAgentDetector detects suspicious user agents
@@ -21,8 +23,13 @@ func NewUserAgentDetector() *UserAgentDetector {
 	return detector
 }
 
+// Name returns the unique identifier for the User Agent detector.
+func (d *UserAgentDetector) Name() string {
+	return "user_agent"
+}
+
 // Match checks if the request contains suspicious user agent patterns
-func (d *UserAgentDetector) Match(r *http.Request) (bool, *BlockReason) {
+func (d *UserAgentDetector) Match(r *http.Request) (bool, *types.BlockReason) {
 	if !d.enabled {
 		return false, nil
 	}
@@ -31,7 +38,7 @@ func (d *UserAgentDetector) Match(r *http.Request) (bool, *BlockReason) {
 	userAgent := r.Header.Get("User-Agent")
 	if userAgent != "" {
 		if d.checkString(userAgent) {
-			return true, &BlockReason{
+			return true, &types.BlockReason{
 				Rule:    "user_agent",
 				Message: "Suspicious user agent detected: " + userAgent,
 			}

@@ -4,14 +4,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 // silentLogger is a logger that doesn't print anything
 type silentLogger struct{}
 
-func (l *silentLogger) LogAttack(r *http.Request, reason *BlockReason) {}
-func (l *silentLogger) LogRequest(r *http.Request)                     {}
-func (l *silentLogger) LogError(err error)                             {}
+func (l *silentLogger) LogAttack(r *http.Request, reason *types.BlockReason) {}
+func (l *silentLogger) LogRequest(r *http.Request)                           {}
+func (l *silentLogger) LogError(err error)                                   {}
 
 // mockBenchRule is a simple rule implementation for benchmarking
 type mockBenchRule struct {
@@ -20,12 +22,12 @@ type mockBenchRule struct {
 	match   bool
 }
 
-func (r *mockBenchRule) Match(req *http.Request) (bool, *BlockReason) {
+func (r *mockBenchRule) Match(req *http.Request) (bool, *types.BlockReason) {
 	if !r.enabled {
 		return false, nil
 	}
 	if r.match {
-		return true, &BlockReason{
+		return true, &types.BlockReason{
 			Rule:    r.name,
 			Message: "Test block reason",
 		}

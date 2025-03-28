@@ -3,8 +3,13 @@ package detectors
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"regexp"
 	"strings"
+
+	// "github.com/tacheshun/waffle/pkg/waffle" // Remove direct import of waffle
+	"github.com/tacheshun/waffle/pkg/types" // Import the new types package
 )
 
 // SQLiDetector detects SQL injection attacks
@@ -27,24 +32,37 @@ func (e *ErrParseForm) Unwrap() error {
 	return e.Err
 }
 
+// Common SQL injection patterns (basic examples)
+// Note: This is NOT exhaustive and should be expanded significantly for real-world use.
+var sqliPatterns = []*regexp.Regexp{
+	// Basic SQL keywords and structures often used in injection
+	regexp.MustCompile(`(?i)(\%27)|(\')|(\-\-)|(\%23)|(#)`),                                        // Basic SQL terminators/comments
+	regexp.MustCompile(`(?i)\b(ALTER|CREATE|DELETE|DROP|EXEC|INSERT|MERGE|SELECT|UPDATE|UNION)\b`), // SQL commands
+	regexp.MustCompile(`(?i)\b(AND|OR)\b.*\b(SELECT|INSERT|UPDATE|DELETE)\b`),                      // Logical operators with commands
+	regexp.MustCompile(`(?i)\b(UNION\s+SELECT)\b`),                                                 // Common UNION SELECT
+	regexp.MustCompile(`(?i)\b(WAITFOR\s+DELAY)\b`),                                                // SQL Server delay
+	regexp.MustCompile(`(?i)\b(SLEEP\s*\(\s*\d+\s*\))\b`),                                          // MySQL/PostgreSQL sleep
+}
+
 // NewSQLiDetector creates a new SQL injection detector
 func NewSQLiDetector() *SQLiDetector {
-	patterns, err := compileSQLiPatterns()
-	if err != nil {
-		// Log the error but continue with any successfully compiled patterns
-		fmt.Printf("Warning: Some SQL injection patterns failed to compile: %v\n", err)
-	}
-
+	// Use the globally defined patterns for simplicity now
+	// Could make patterns configurable later
 	detector := &SQLiDetector{
 		enabled:  true,
-		patterns: patterns,
+		patterns: sqliPatterns, // Use the defined patterns
 		name:     "sql_injection",
 	}
 	return detector
 }
 
+// Name returns the unique identifier for the SQLi detector.
+func (d *SQLiDetector) Name() string {
+	return "sql_injection"
+}
+
 // Match checks if the request contains SQL injection patterns
-func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
+func (d *SQLiDetector) Match(r *http.Request) (bool, *types.BlockReason) {
 	if !d.enabled {
 		return false, nil
 	}
@@ -54,21 +72,27 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 	}
 
 	// Parse form data to access POST parameters
-	if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
-		// Only try to parse the form for methods that might have form data
-		err := r.ParseForm()
-		if err != nil {
-			// Still continue with what we can check, but wrap the error for better context
-			return false, &BlockReason{
-				Rule:    "internal_error",
-				Message: (&ErrParseForm{Err: err}).Error(),
+	// Only parse form if it's a relevant method and content type
+	contentType := r.Header.Get("Content-Type")
+	if (r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) &&
+		(strings.Contains(contentType, "application/x-www-form-urlencoded") || strings.Contains(contentType, "multipart/form-data")) {
+		// Limit body size read during ParseMultipartForm to prevent DoS
+		const maxMemory = 32 << 20 // 32MB
+		err := r.ParseMultipartForm(maxMemory)
+		if err != nil && err != http.ErrNotMultipart {
+			// Try ParseForm as a fallback for urlencoded
+			if parseErr := r.ParseForm(); parseErr != nil {
+				// Log the error but continue
+				fmt.Fprintf(os.Stderr, "Error parsing form in sqli detector: %v\n", parseErr)
+				// return false, nil // Optionally return early
 			}
 		}
 	}
 
 	// Check URL path
-	if matched, _ := d.checkString(r.URL.Path); matched {
-		return true, &BlockReason{
+	decodedPath, _ := url.PathUnescape(r.URL.Path)
+	if matched, _ := d.checkString(decodedPath); matched {
+		return true, &types.BlockReason{
 			Rule:    d.name,
 			Message: "SQL injection detected in URL path",
 		}
@@ -77,22 +101,35 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 	// Check query parameters
 	for key, values := range r.URL.Query() {
 		for _, value := range values {
-			if matched, _ := d.checkString(value); matched {
-				return true, &BlockReason{
+			decodedValue, _ := url.QueryUnescape(value) // Ignore decode error, check raw below
+			if matched, _ := d.checkString(decodedValue); matched {
+				return true, &types.BlockReason{
 					Rule:    d.name,
 					Message: fmt.Sprintf("SQL injection detected in query parameter: %s", key),
+				}
+			}
+			// Check raw value too
+			if decodedValue != value {
+				if matched, _ := d.checkString(value); matched {
+					return true, &types.BlockReason{
+						Rule:    d.name,
+						Message: fmt.Sprintf("SQL injection detected in raw query parameter: %s", key),
+					}
 				}
 			}
 		}
 	}
 
-	// Check form parameters
-	for key, values := range r.Form {
-		for _, value := range values {
-			if matched, _ := d.checkString(value); matched {
-				return true, &BlockReason{
-					Rule:    d.name,
-					Message: fmt.Sprintf("SQL injection detected in form parameter: %s", key),
+	// Check form parameters (requires form to be parsed)
+	if r.Form != nil {
+		for key, values := range r.Form {
+			for _, value := range values {
+				// Form values are typically already decoded by ParseForm/ParseMultipartForm
+				if matched, _ := d.checkString(value); matched {
+					return true, &types.BlockReason{
+						Rule:    d.name,
+						Message: fmt.Sprintf("SQL injection detected in form parameter: %s", key),
+					}
 				}
 			}
 		}
@@ -100,26 +137,49 @@ func (d *SQLiDetector) Match(r *http.Request) (bool, *BlockReason) {
 
 	// Check cookies
 	for _, cookie := range r.Cookies() {
-		if matched, _ := d.checkString(cookie.Value); matched {
-			return true, &BlockReason{
+		decodedValue, _ := url.QueryUnescape(cookie.Value) // Cookies might be URL encoded
+		if matched, _ := d.checkString(decodedValue); matched {
+			return true, &types.BlockReason{
 				Rule:    d.name,
 				Message: fmt.Sprintf("SQL injection detected in cookie: %s", cookie.Name),
 			}
 		}
-	}
-
-	// Check headers (some common ones that might be used in SQL)
-	headersToCheck := []string{"User-Agent", "Referer", "X-Forwarded-For", "X-Real-IP", "Authorization"}
-	for _, header := range headersToCheck {
-		if value := r.Header.Get(header); value != "" {
-			if matched, _ := d.checkString(value); matched {
-				return true, &BlockReason{
+		// Check raw value too
+		if decodedValue != cookie.Value {
+			if matched, _ := d.checkString(cookie.Value); matched {
+				return true, &types.BlockReason{
 					Rule:    d.name,
-					Message: fmt.Sprintf("SQL injection detected in header: %s", header),
+					Message: fmt.Sprintf("SQL injection detected in raw cookie: %s", cookie.Name),
 				}
 			}
 		}
 	}
+
+	// Check headers (some common ones that might be used)
+	headersToCheck := []string{"User-Agent", "Referer", "X-Forwarded-For", "X-Real-IP", "Authorization"}
+	for _, header := range headersToCheck {
+		if value := r.Header.Get(header); value != "" {
+			decodedValue, _ := url.QueryUnescape(value) // Headers can sometimes be encoded
+			if matched, _ := d.checkString(decodedValue); matched {
+				return true, &types.BlockReason{
+					Rule:    d.name,
+					Message: fmt.Sprintf("SQL injection detected in header: %s", header),
+				}
+			}
+			// Check raw value too
+			if decodedValue != value {
+				if matched, _ := d.checkString(value); matched {
+					return true, &types.BlockReason{
+						Rule:    d.name,
+						Message: fmt.Sprintf("SQL injection detected in raw header: %s", header),
+					}
+				}
+			}
+		}
+	}
+
+	// Check request body (JSON, XML etc.) - More complex, requires careful implementation
+	// TODO: Add configurable body inspection based on Content-Type
 
 	return false, nil
 }
@@ -146,12 +206,13 @@ func (d *SQLiDetector) checkString(s string) (bool, string) {
 		return false, ""
 	}
 
-	// Normalize the string
-	s = strings.ToLower(s)
+	// Normalization can be complex (e.g., handling different encodings, comments)
+	// For now, simple lowercase
+	normalized := strings.ToLower(s)
 
 	// Check against patterns
 	for _, pattern := range d.patterns {
-		if pattern.MatchString(s) {
+		if pattern.MatchString(normalized) {
 			return true, pattern.String()
 		}
 	}
@@ -159,47 +220,4 @@ func (d *SQLiDetector) checkString(s string) (bool, string) {
 	return false, ""
 }
 
-// compileSQLiPatterns compiles regex patterns for SQL injection detection
-// Returns any errors that occurred during compilation, but still returns
-// all successfully compiled patterns
-func compileSQLiPatterns() ([]*regexp.Regexp, error) {
-	// Common SQL injection patterns
-	patterns := []string{
-		`(?i)(\%27)|(\')|(\-\-)|(\%23)|(#)`,
-		`(?i)((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))`,
-		`(?i)(\w|\d|\.)+\s+as\s+\w+\s*from`,
-		`(?i)select\s+[\w\*\)\(\,\s]+\s+from\s+[\w\.]+`,
-		`(?i)insert\s+into\s+[\w\.]+\s*[\(\w\s\)\,]*\s*values\s*\(`,
-		`(?i)delete\s+from\s+[\w\.]+`,
-		`(?i)update\s+[\w\.]+\s+set\s+[\w\s\=\,]+`,
-		`(?i)(union\s+select)`,
-		`(?i)(select\s+sleep\s*\()`,
-		`(?i)(waitfor\s+delay\s*\')`,
-		`(?i)(select\s+benchmark\s*\()`,
-	}
-
-	compiled := make([]*regexp.Regexp, 0, len(patterns))
-	var compileErrors error
-
-	for _, pattern := range patterns {
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			if compileErrors == nil {
-				compileErrors = fmt.Errorf("failed to compile pattern %q: %w", pattern, err)
-			} else {
-				compileErrors = fmt.Errorf("%v; failed to compile pattern %q: %w", compileErrors, pattern, err)
-			}
-			continue
-		}
-		compiled = append(compiled, re)
-	}
-
-	return compiled, compileErrors
-}
-
-// BlockReason contains information about why a request was blocked
-type BlockReason struct {
-	Rule    string
-	Message string
-	Wait    int // For rate limiting, seconds to wait
-}
+// No need for compileSQLiPatterns here anymore if using global var

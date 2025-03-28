@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 // TestNew tests the creation of a new Waffle instance
@@ -45,7 +47,7 @@ func TestAddRule(t *testing.T) {
 	waf := New(WithDefaultRules(false))
 
 	// Add a rule
-	rule := &mockRule{enabled: true}
+	rule := &mockRuleWaffleTest{enabled: true}
 	waf.AddRule(rule)
 
 	if len(waf.rules) != 1 {
@@ -78,10 +80,10 @@ func TestProcess(t *testing.T) {
 			name: "Block request with matching rule",
 			setupWAF: func() *Waffle {
 				waf := New(WithDefaultRules(false))
-				waf.AddRule(&mockRule{
+				waf.AddRule(&mockRuleWaffleTest{
 					enabled: true,
 					match:   true,
-					reason: &BlockReason{
+					reason: &types.BlockReason{
 						Rule:    "test_rule",
 						Message: "Test block reason",
 					},
@@ -96,10 +98,10 @@ func TestProcess(t *testing.T) {
 			name: "Allow request with disabled rule",
 			setupWAF: func() *Waffle {
 				waf := New(WithDefaultRules(false))
-				waf.AddRule(&mockRule{
+				waf.AddRule(&mockRuleWaffleTest{
 					enabled: false,
 					match:   true,
-					reason: &BlockReason{
+					reason: &types.BlockReason{
 						Rule:    "test_rule",
 						Message: "Test block reason",
 					},
@@ -144,13 +146,16 @@ func TestProcess(t *testing.T) {
 
 // Mock implementations for testing
 
-type mockRule struct {
+type mockRuleWaffleTest struct {
 	enabled bool
 	match   interface{} // Can be bool or func(*http.Request) bool
-	reason  *BlockReason
+	reason  *types.BlockReason
 }
 
-func (r *mockRule) Match(req *http.Request) (bool, *BlockReason) {
+func (r *mockRuleWaffleTest) Match(req *http.Request) (bool, *types.BlockReason) {
+	if !r.enabled {
+		return false, nil
+	}
 	if matchFunc, ok := r.match.(func(*http.Request) bool); ok {
 		if matchFunc(req) {
 			return true, r.reason
@@ -165,16 +170,23 @@ func (r *mockRule) Match(req *http.Request) (bool, *BlockReason) {
 	return false, nil
 }
 
-func (r *mockRule) IsEnabled() bool {
+func (r *mockRuleWaffleTest) IsEnabled() bool {
 	return r.enabled
 }
 
-func (r *mockRule) Enable() {
+func (r *mockRuleWaffleTest) Enable() {
 	r.enabled = true
 }
 
-func (r *mockRule) Disable() {
+func (r *mockRuleWaffleTest) Disable() {
 	r.enabled = false
+}
+
+func (r *mockRuleWaffleTest) Name() string {
+	if r.reason != nil {
+		return r.reason.Rule
+	}
+	return "mock_rule_waffle_test_unnamed"
 }
 
 type mockRateLimiter struct {
@@ -192,18 +204,18 @@ func (rl *mockRateLimiter) Reset(r *http.Request) error {
 }
 
 type mockLogger struct {
-	attacks  []*loggedAttack
+	attacks  []*loggedAttackWaffleTest
 	requests []*http.Request
 	errors   []error
 }
 
-type loggedAttack struct {
+type loggedAttackWaffleTest struct {
 	request *http.Request
-	reason  *BlockReason
+	reason  *types.BlockReason
 }
 
-func (l *mockLogger) LogAttack(r *http.Request, reason *BlockReason) {
-	l.attacks = append(l.attacks, &loggedAttack{
+func (l *mockLogger) LogAttack(r *http.Request, reason *types.BlockReason) {
+	l.attacks = append(l.attacks, &loggedAttackWaffleTest{
 		request: r,
 		reason:  reason,
 	})

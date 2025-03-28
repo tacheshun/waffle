@@ -1,9 +1,14 @@
 package detectors
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"regexp"
 	"strings"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 // CommandInjectionDetector detects command injection attacks
@@ -21,21 +26,37 @@ func NewCommandInjectionDetector() *CommandInjectionDetector {
 	return detector
 }
 
+// Name returns the unique identifier for the Command Injection detector.
+func (d *CommandInjectionDetector) Name() string {
+	return "command_injection"
+}
+
 // Match checks if the request contains command injection patterns
-func (d *CommandInjectionDetector) Match(r *http.Request) (bool, *BlockReason) {
+func (d *CommandInjectionDetector) Match(r *http.Request) (bool, *types.BlockReason) {
 	if !d.enabled {
 		return false, nil
 	}
 
 	// Parse form data to access POST parameters
-	if err := r.ParseForm(); err != nil {
-		// If form parsing fails, continue with what we can check
-		_ = err // Prevent empty branch warning
+	const maxMemory = 32 << 20 // 32MB
+	contentType := r.Header.Get("Content-Type")
+	if (r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) &&
+		(strings.Contains(contentType, "application/x-www-form-urlencoded") || strings.Contains(contentType, "multipart/form-data")) {
+		err := r.ParseMultipartForm(maxMemory)
+		if err != nil && err != http.ErrNotMultipart {
+			if parseErr := r.ParseForm(); parseErr != nil {
+				// Log the error but continue, as other parts might be checkable
+				// Consider if returning early is more appropriate depending on security posture
+				fmt.Fprintf(os.Stderr, "Error parsing form in cmdi detector: %v\n", parseErr)
+				// return false, nil // Optionally return early
+			}
+		}
 	}
 
 	// Check URL path
-	if d.checkString(r.URL.Path) {
-		return true, &BlockReason{
+	decodedPath, _ := url.PathUnescape(r.URL.Path)
+	if d.checkString(decodedPath) {
+		return true, &types.BlockReason{
 			Rule:    "command_injection",
 			Message: "Command injection detected in URL path",
 		}
@@ -44,22 +65,32 @@ func (d *CommandInjectionDetector) Match(r *http.Request) (bool, *BlockReason) {
 	// Check query parameters
 	for key, values := range r.URL.Query() {
 		for _, value := range values {
-			if d.checkString(value) {
-				return true, &BlockReason{
+			decodedValue, _ := url.QueryUnescape(value)
+			if d.checkString(decodedValue) {
+				return true, &types.BlockReason{
 					Rule:    "command_injection",
 					Message: "Command injection detected in query parameter: " + key,
+				}
+			}
+			// Check raw value
+			if decodedValue != value && d.checkString(value) {
+				return true, &types.BlockReason{
+					Rule:    "command_injection",
+					Message: "Command injection detected in raw query parameter: " + key,
 				}
 			}
 		}
 	}
 
 	// Check form parameters
-	for key, values := range r.Form {
-		for _, value := range values {
-			if d.checkString(value) {
-				return true, &BlockReason{
-					Rule:    "command_injection",
-					Message: "Command injection detected in form parameter: " + key,
+	if r.Form != nil {
+		for key, values := range r.Form {
+			for _, value := range values {
+				if d.checkString(value) {
+					return true, &types.BlockReason{
+						Rule:    "command_injection",
+						Message: "Command injection detected in form parameter: " + key,
+					}
 				}
 			}
 		}
@@ -75,10 +106,20 @@ func (d *CommandInjectionDetector) Match(r *http.Request) (bool, *BlockReason) {
 
 	for _, header := range headersToCheck {
 		value := r.Header.Get(header)
-		if value != "" && d.checkString(value) {
-			return true, &BlockReason{
-				Rule:    "command_injection",
-				Message: "Command injection detected in header: " + header,
+		if value != "" {
+			decodedValue, _ := url.QueryUnescape(value)
+			if d.checkString(decodedValue) {
+				return true, &types.BlockReason{
+					Rule:    "command_injection",
+					Message: "Command injection detected in header: " + header,
+				}
+			}
+			// Check raw value
+			if decodedValue != value && d.checkString(value) {
+				return true, &types.BlockReason{
+					Rule:    "command_injection",
+					Message: "Command injection detected in raw header: " + header,
+				}
 			}
 		}
 	}

@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 // TestIntegration tests the integration of all components
@@ -51,7 +53,7 @@ func TestIntegration(t *testing.T) {
 						return strings.Contains(r.URL.RawQuery, "OR+1=1") ||
 							strings.Contains(r.URL.RawQuery, "OR%201=1")
 					},
-					reason: &BlockReason{
+					reason: &types.BlockReason{
 						Rule:    "sql_injection",
 						Message: "SQL Injection detected",
 					},
@@ -74,7 +76,7 @@ func TestIntegration(t *testing.T) {
 						return strings.Contains(r.URL.RawQuery, "<script>") ||
 							strings.Contains(r.URL.RawQuery, "%3Cscript%3E")
 					},
-					reason: &BlockReason{
+					reason: &types.BlockReason{
 						Rule:    "xss",
 						Message: "XSS detected",
 					},
@@ -96,7 +98,7 @@ func TestIntegration(t *testing.T) {
 					match: func(r *http.Request) bool {
 						return strings.Contains(r.URL.Path, "../")
 					},
-					reason: &BlockReason{
+					reason: &types.BlockReason{
 						Rule:    "path_traversal",
 						Message: "Path traversal detected",
 					},
@@ -118,7 +120,7 @@ func TestIntegration(t *testing.T) {
 					match: func(r *http.Request) bool {
 						return true // Would match everything if enabled
 					},
-					reason: &BlockReason{
+					reason: &types.BlockReason{
 						Rule:    "disabled_rule",
 						Message: "This rule is disabled",
 					},
@@ -137,7 +139,7 @@ func TestIntegration(t *testing.T) {
 				waf.AddRule(&mockRule{
 					enabled: true,
 					match:   true,
-					reason: &BlockReason{
+					reason: &types.BlockReason{
 						Rule:    "custom_rule",
 						Message: "Custom rule blocked",
 					},
@@ -244,7 +246,7 @@ func TestCustomDetectors(t *testing.T) {
 			waf.AddRule(&mockRule{
 				enabled: true,
 				match:   tt.detector.shouldDetect,
-				reason: &BlockReason{
+				reason: &types.BlockReason{
 					Rule:    "custom_detector",
 					Message: tt.detector.reason,
 				},
@@ -313,4 +315,47 @@ func testHandlerCustomLogic(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
+}
+
+// Example mockRule structure (adjust if different in actual file)
+type mockRule struct {
+	enabled bool
+	match   interface{} // Can be bool or func(*http.Request) bool
+	reason  *types.BlockReason
+}
+
+func (r *mockRule) Match(req *http.Request) (bool, *types.BlockReason) {
+	if !r.enabled {
+		return false, nil
+	}
+	if matchFunc, ok := r.match.(func(*http.Request) bool); ok {
+		if matchFunc(req) {
+			return true, r.reason
+		}
+		return false, nil
+	}
+	if matchBool, ok := r.match.(bool); ok && matchBool {
+		return true, r.reason
+	}
+	return false, nil
+}
+
+func (r *mockRule) IsEnabled() bool {
+	return r.enabled
+}
+
+func (r *mockRule) Enable() {
+	r.enabled = true
+}
+
+func (r *mockRule) Disable() {
+	r.enabled = false
+}
+
+// Name returns the rule name from the BlockReason.
+func (r *mockRule) Name() string {
+	if r.reason != nil {
+		return r.reason.Rule
+	}
+	return "mock_rule_unnamed" // Fallback name
 }

@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 func TestDefaultOptions(t *testing.T) {
@@ -106,7 +108,7 @@ func TestWithLogger(t *testing.T) {
 func TestWithBlockHandler(t *testing.T) {
 	// Create a mock block handler
 	called := false
-	mockHandler := func(reason *BlockReason) {
+	mockHandler := func(reason *types.BlockReason) {
 		called = true
 	}
 
@@ -120,7 +122,7 @@ func TestWithBlockHandler(t *testing.T) {
 	}
 
 	// Call the handler and check if it was called
-	opts.blockHandler(&BlockReason{})
+	opts.blockHandler(&types.BlockReason{})
 	if !called {
 		t.Errorf("Expected block handler to be called")
 	}

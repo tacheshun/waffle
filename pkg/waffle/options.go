@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 // Options contains configuration options for the Waffle WAF
@@ -11,10 +13,10 @@ type Options struct {
 	useDefaultRules bool
 	limiter         RateLimiter
 	logger          Logger
-	logAllRequests  bool               // Whether to log all requests, not just attacks
-	blockHandler    func(*BlockReason) // Custom handler for blocked requests
-	tlsCertFile     string             // Path to TLS certificate file
-	tlsKeyFile      string             // Path to TLS private key file
+	logAllRequests  bool                     // Whether to log all requests, not just attacks
+	blockHandler    func(*types.BlockReason) // Custom handler for blocked requests
+	tlsCertFile     string                   // Path to TLS certificate file
+	tlsKeyFile      string                   // Path to TLS private key file
 }
 
 // Option is a function that configures a Waffle instance
@@ -55,7 +57,7 @@ func WithLogger(logger Logger) Option {
 }
 
 // WithBlockHandler sets a custom handler for blocked requests
-func WithBlockHandler(handler func(*BlockReason)) Option {
+func WithBlockHandler(handler func(*types.BlockReason)) Option {
 	return func(o *Options) {
 		o.blockHandler = handler
 	}
@@ -79,7 +81,7 @@ func WithTLS(certFile, keyFile string) Option {
 // defaultLogger is a basic implementation of the Logger interface
 type defaultLogger struct{}
 
-func (l *defaultLogger) LogAttack(r *http.Request, reason *BlockReason) {
+func (l *defaultLogger) LogAttack(r *http.Request, reason *types.BlockReason) {
 	// Better logging with structured information
 	fmt.Fprintf(os.Stderr, "ATTACK BLOCKED: IP=%s Method=%s Path=%s Rule=%s Message=%s\n",
 		r.RemoteAddr, r.Method, r.URL.Path, reason.Rule, reason.Message)

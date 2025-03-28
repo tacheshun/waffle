@@ -4,20 +4,51 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/tacheshun/waffle/pkg/detectors"
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
-// Detector interface for testing
-type Detector interface {
-	Detect(*http.Request) (bool, string)
+// Mock detector for TestBaseRuleMethods
+type mockBaseRuleDetector struct {
+	matchCalled *bool
+	blockReason *types.BlockReason
 }
+
+func (d *mockBaseRuleDetector) Match(r *http.Request) (bool, *types.BlockReason) {
+	*d.matchCalled = true
+	return true, d.blockReason
+}
+func (d *mockBaseRuleDetector) Name() string    { return "mock_base_rule_detector" }
+func (d *mockBaseRuleDetector) IsEnabled() bool { return true }
+func (d *mockBaseRuleDetector) Enable()         {}
+func (d *mockBaseRuleDetector) Disable()        {}
+
+// Mock detector for TestRuleMethods - renamed from testDetector and adapted
+type mockRuleMethodsDetector struct {
+	shouldMatch bool
+}
+
+func (d *mockRuleMethodsDetector) Match(req *http.Request) (bool, *types.BlockReason) {
+	if d.shouldMatch {
+		return true, &types.BlockReason{Rule: "mock_rule_methods_detector", Message: "Test detection"}
+	}
+	return false, nil
+}
+func (d *mockRuleMethodsDetector) Name() string { return "mock_rule_methods_detector" }
+func (d *mockRuleMethodsDetector) IsEnabled() bool {
+	return true
+}
+func (d *mockRuleMethodsDetector) Enable()  {}
+func (d *mockRuleMethodsDetector) Disable() {}
 
 // TestRuleMethods tests the methods of the Rule interface
 func TestRuleMethods(t *testing.T) {
-	// Create a test rule
+	// Create a test rule with the adapted mock detector
 	rule := &testRule{
 		name:     "test_rule",
 		enabled:  true,
-		detector: &testDetector{shouldMatch: false},
+		detector: &mockRuleMethodsDetector{shouldMatch: false},
 	}
 
 	// Test IsEnabled
@@ -45,7 +76,7 @@ func TestRuleMethods(t *testing.T) {
 	}
 
 	// Test Match with match
-	rule.detector = &testDetector{shouldMatch: true}
+	rule.detector = &mockRuleMethodsDetector{shouldMatch: true}
 	match, reason = rule.Match(req)
 	if !match {
 		t.Errorf("Expected match, got no match")
@@ -60,17 +91,18 @@ func TestRuleMethods(t *testing.T) {
 
 // TestBaseRuleMethods tests the methods of the baseRule implementation
 func TestBaseRuleMethods(t *testing.T) {
-	// Create a baseRule with a match function that returns true
+	// Create a baseRule wrapping the new mock detector
 	matchCalled := false
+	mockReason := &types.BlockReason{
+		Rule:    "mock_base_rule_detector",
+		Message: "Test base rule matched",
+	}
 	rule := &baseRule{
 		name:    "test_base_rule",
 		enabled: true,
-		matchFn: func(r *http.Request) (bool, *BlockReason) {
-			matchCalled = true
-			return true, &BlockReason{
-				Rule:    "test_base_rule",
-				Message: "Test base rule matched",
-			}
+		detector: &mockBaseRuleDetector{
+			matchCalled: &matchCalled,
+			blockReason: mockReason,
 		},
 	}
 
@@ -95,22 +127,17 @@ func TestBaseRuleMethods(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 	match, reason := rule.Match(req)
 
-	// Verify match function was called
 	if !matchCalled {
-		t.Errorf("Expected match function to be called")
+		t.Errorf("Expected match function (via detector) to be called")
 	}
-
-	// Verify match result
 	if !match {
 		t.Errorf("Expected match to be true")
 	}
-
-	// Verify reason
-	if reason.Rule != "test_base_rule" {
-		t.Errorf("Expected rule name in reason to be 'test_base_rule', got '%s'", reason.Rule)
+	if reason.Rule != mockReason.Rule {
+		t.Errorf("Expected rule name in reason to be '%s', got '%s'", mockReason.Rule, reason.Rule)
 	}
-	if reason.Message != "Test base rule matched" {
-		t.Errorf("Expected message in reason to be 'Test base rule matched', got '%s'", reason.Message)
+	if reason.Message != mockReason.Message {
+		t.Errorf("Expected message in reason to be '%s', got '%s'", mockReason.Message, reason.Message)
 	}
 }
 
@@ -197,19 +224,19 @@ func TestDefaultRules(t *testing.T) {
 type testRule struct {
 	name     string
 	enabled  bool
-	detector Detector
+	detector detectors.Detector
 }
 
-func (r *testRule) Match(req *http.Request) (bool, *BlockReason) {
+func (r *testRule) Match(req *http.Request) (bool, *types.BlockReason) {
 	if !r.enabled {
 		return false, nil
 	}
 
-	match, msg := r.detector.Detect(req)
+	match, reason := r.detector.Match(req)
 	if match {
-		return true, &BlockReason{
+		return true, &types.BlockReason{
 			Rule:    r.name,
-			Message: msg,
+			Message: reason.Message,
 		}
 	}
 	return false, nil
@@ -227,14 +254,7 @@ func (r *testRule) Disable() {
 	r.enabled = false
 }
 
-// testDetector is a simple implementation of the Detector interface for testing
-type testDetector struct {
-	shouldMatch bool
-}
-
-func (d *testDetector) Detect(req *http.Request) (bool, string) {
-	if d.shouldMatch {
-		return true, "Test detection"
-	}
-	return false, ""
+// Name returns the name of the rule.
+func (r *testRule) Name() string {
+	return r.name
 }

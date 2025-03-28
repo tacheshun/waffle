@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/tacheshun/waffle/pkg/types"
 	"github.com/tacheshun/waffle/pkg/waffle"
 )
 
@@ -184,7 +185,7 @@ type mockRule struct {
 	enabled bool
 }
 
-func (r *mockRule) Match(req *http.Request) (bool, *waffle.BlockReason) {
+func (r *mockRule) Match(req *http.Request) (bool, *types.BlockReason) {
 	return false, nil
 }
 
@@ -200,16 +201,20 @@ func (r *mockRule) Disable() {
 	r.enabled = false
 }
 
+func (r *mockRule) Name() string {
+	return "mock_rule_benchmark_no_match"
+}
+
 // mockRuleAlwaysMatch is a simple implementation of the Rule interface for testing
 // This rule always matches
 type mockRuleAlwaysMatch struct {
 	enabled bool
 }
 
-func (r *mockRuleAlwaysMatch) Match(req *http.Request) (bool, *waffle.BlockReason) {
-	return true, &waffle.BlockReason{
-		Rule:    "test_rule",
-		Message: "Test block reason",
+func (r *mockRuleAlwaysMatch) Match(req *http.Request) (bool, *types.BlockReason) {
+	return true, &types.BlockReason{
+		Rule:    "mock_always_match",
+		Message: "Always matching rule",
 	}
 }
 
@@ -223,4 +228,8 @@ func (r *mockRuleAlwaysMatch) Enable() {
 
 func (r *mockRuleAlwaysMatch) Disable() {
 	r.enabled = false
+}
+
+func (r *mockRuleAlwaysMatch) Name() string {
+	return "mock_always_match"
 }

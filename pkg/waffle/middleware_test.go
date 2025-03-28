@@ -8,7 +8,53 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/labstack/echo/v4"
+
+	"github.com/tacheshun/waffle/pkg/detectors"
+	"github.com/tacheshun/waffle/pkg/types"
 )
+
+// ---- Mocks specific to middleware_test.go ----
+
+type mockDetectorMiddleware struct {
+	shouldMatch bool
+}
+
+func (d *mockDetectorMiddleware) Match(req *http.Request) (bool, *types.BlockReason) {
+	if d.shouldMatch {
+		return true, &types.BlockReason{Rule: "mock_detector_middleware", Message: "Test detection"}
+	}
+	return false, nil
+}
+func (d *mockDetectorMiddleware) Name() string    { return "mock_detector_middleware" }
+func (d *mockDetectorMiddleware) IsEnabled() bool { return true }
+func (d *mockDetectorMiddleware) Enable()         {}
+func (d *mockDetectorMiddleware) Disable()        {}
+
+type mockRuleMiddleware struct {
+	name     string
+	enabled  bool
+	detector detectors.Detector
+}
+
+func (r *mockRuleMiddleware) Match(req *http.Request) (bool, *types.BlockReason) {
+	if !r.enabled {
+		return false, nil
+	}
+	match, reason := r.detector.Match(req)
+	if match {
+		return true, &types.BlockReason{
+			Rule:    r.name,
+			Message: reason.Message,
+		}
+	}
+	return false, nil
+}
+func (r *mockRuleMiddleware) IsEnabled() bool { return r.enabled }
+func (r *mockRuleMiddleware) Enable()         { r.enabled = true }
+func (r *mockRuleMiddleware) Disable()        { r.enabled = false }
+func (r *mockRuleMiddleware) Name() string    { return r.name }
+
+// ---- End Mocks ----
 
 // TestMiddleware tests the standard net/http middleware
 func TestMiddleware(t *testing.T) {
@@ -31,10 +77,10 @@ func TestMiddleware(t *testing.T) {
 			name: "Block request",
 			setupWaffle: func() *Waffle {
 				w := New()
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
@@ -57,21 +103,18 @@ func TestMiddleware(t *testing.T) {
 		{
 			name: "Block request with custom handler",
 			setupWaffle: func() *Waffle {
-				w := New(WithBlockHandler(func(reason *BlockReason) {
-					// Custom handler just returns without writing a response
-					// This simulates a custom handler that handles the response itself
-					// This empty block is intentional for testing purposes
-					_ = reason // Prevent empty block warning
+				w := New(WithBlockHandler(func(reason *types.BlockReason) {
+					_ = reason
 				}))
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
-			expectedStatus: http.StatusOK, // Custom handler doesn't write a response, so we get 200 OK
-			expectedBody:   "",            // No body is written
+			expectedStatus: http.StatusOK,
+			expectedBody:   "",
 		},
 	}
 
@@ -138,10 +181,10 @@ func TestHandlerFunc(t *testing.T) {
 			name: "Block request",
 			setupWaffle: func() *Waffle {
 				w := New()
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
@@ -164,21 +207,18 @@ func TestHandlerFunc(t *testing.T) {
 		{
 			name: "Block request with custom handler",
 			setupWaffle: func() *Waffle {
-				w := New(WithBlockHandler(func(reason *BlockReason) {
-					// Custom handler just returns without writing a response
-					// This simulates a custom handler that handles the response itself
-					// This empty block is intentional for testing purposes
-					_ = reason // Prevent empty block warning
+				w := New(WithBlockHandler(func(reason *types.BlockReason) {
+					_ = reason
 				}))
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
-			expectedStatus: http.StatusOK, // Custom handler doesn't write a response, so we get 200 OK
-			expectedBody:   "",            // No body is written
+			expectedStatus: http.StatusOK,
+			expectedBody:   "",
 		},
 	}
 
@@ -226,7 +266,6 @@ func TestHandlerFunc(t *testing.T) {
 
 // TestGinMiddleware tests the Gin framework middleware
 func TestGinMiddleware(t *testing.T) {
-	// Set Gin to test mode
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
@@ -248,10 +287,10 @@ func TestGinMiddleware(t *testing.T) {
 			name: "Block request",
 			setupWaffle: func() *Waffle {
 				w := New()
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
@@ -274,21 +313,18 @@ func TestGinMiddleware(t *testing.T) {
 		{
 			name: "Block request with custom handler",
 			setupWaffle: func() *Waffle {
-				w := New(WithBlockHandler(func(reason *BlockReason) {
-					// Custom handler just returns without writing a response
-					// This simulates a custom handler that handles the response itself
-					// This empty block is intentional for testing purposes
-					_ = reason // Prevent empty block warning
+				w := New(WithBlockHandler(func(reason *types.BlockReason) {
+					_ = reason
 				}))
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
-			expectedStatus: http.StatusOK, // Custom handler doesn't write a response, so we get 200 OK
-			expectedBody:   "",            // No body is written
+			expectedStatus: http.StatusOK,
+			expectedBody:   "",
 		},
 	}
 
@@ -352,10 +388,10 @@ func TestEchoMiddleware(t *testing.T) {
 			name: "Block request",
 			setupWaffle: func() *Waffle {
 				w := New()
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
@@ -378,21 +414,18 @@ func TestEchoMiddleware(t *testing.T) {
 		{
 			name: "Block request with custom handler",
 			setupWaffle: func() *Waffle {
-				w := New(WithBlockHandler(func(reason *BlockReason) {
-					// Custom handler just returns without writing a response
-					// This simulates a custom handler that handles the response itself
-					// This empty block is intentional for testing purposes
-					_ = reason // Prevent empty block warning
+				w := New(WithBlockHandler(func(reason *types.BlockReason) {
+					_ = reason
 				}))
-				w.AddRule(&testRule{
+				w.AddRule(&mockRuleMiddleware{
 					name:     "test_rule",
 					enabled:  true,
-					detector: &testDetector{shouldMatch: true},
+					detector: &mockDetectorMiddleware{shouldMatch: true},
 				})
 				return w
 			},
-			expectedStatus: http.StatusOK, // Custom handler doesn't write a response, so we get 200 OK
-			expectedBody:   "",            // No body is written
+			expectedStatus: http.StatusOK,
+			expectedBody:   "",
 		},
 	}
 

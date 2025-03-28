@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/tacheshun/waffle/pkg/types"
 )
 
 // loggerTestMock implements the Logger interface and writes to a buffer for testing
@@ -15,7 +17,7 @@ type loggerTestMock struct {
 	buffer bytes.Buffer
 }
 
-func (l *loggerTestMock) LogAttack(r *http.Request, reason *BlockReason) {
+func (l *loggerTestMock) LogAttack(r *http.Request, reason *types.BlockReason) {
 	fmt.Fprintf(&l.buffer, "ATTACK BLOCKED: %s %s %s Reason: %s %s\n",
 		r.RemoteAddr, r.Method, r.URL.Path, reason.Rule, reason.Message)
 }
@@ -36,7 +38,7 @@ func TestLogger(t *testing.T) {
 	// Test LogAttack
 	req := httptest.NewRequest("GET", "/test", nil)
 	req.RemoteAddr = "192.168.1.1:12345"
-	reason := &BlockReason{
+	reason := &types.BlockReason{
 		Rule:    "TEST-RULE",
 		Message: "Test attack detected",
 	}
@@ -83,7 +85,7 @@ func TestDefaultLogger(t *testing.T) {
 
 	// Just verify it doesn't panic when called
 	req := httptest.NewRequest("GET", "/test", nil)
-	reason := &BlockReason{
+	reason := &types.BlockReason{
 		Rule:    "TEST-RULE",
 		Message: "Test attack detected",
 	}

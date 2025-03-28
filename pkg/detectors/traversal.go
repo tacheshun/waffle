@@ -1,11 +1,15 @@
 package detectors
 
 import (
+	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
-	"github.com/tacheshun/waffle/pkg/waffle"
+	// "github.com/tacheshun/waffle/pkg/waffle" // Remove incorrect import
+	"github.com/tacheshun/waffle/pkg/types" // Import types package
 )
 
 // PathTraversalDetector detects path traversal attacks
@@ -23,45 +27,69 @@ func NewPathTraversalDetector() *PathTraversalDetector {
 	return detector
 }
 
-// Match checks if the request contains path traversal patterns
-func (d *PathTraversalDetector) Match(r *http.Request) (bool, *BlockReason) {
+// Name returns the unique identifier for the Path Traversal detector.
+func (d *PathTraversalDetector) Name() string {
+	return "path_traversal"
+}
+
+// Match checks the request for potential Path Traversal patterns.
+func (d *PathTraversalDetector) Match(r *http.Request) (bool, *types.BlockReason) {
 	if !d.enabled {
 		return false, nil
 	}
 
 	// Check URL path - this is the primary vector for path traversal
-	if d.checkString(r.URL.Path) {
-		return true, &BlockReason{
+	decodedPath, _ := url.PathUnescape(r.URL.Path)
+	if d.checkString(decodedPath) {
+		return true, &types.BlockReason{
 			Rule:    "path_traversal",
 			Message: "Path traversal detected in URL path",
 		}
 	}
 
 	// Parse form data to access POST parameters
-	if err := r.ParseForm(); err != nil {
-		// If form parsing fails, continue with what we can check
-		_ = err // Prevent empty branch warning
+	const maxMemory = 32 << 20 // 32MB
+	contentType := r.Header.Get("Content-Type")
+	if (r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) &&
+		(strings.Contains(contentType, "application/x-www-form-urlencoded") || strings.Contains(contentType, "multipart/form-data")) {
+		err := r.ParseMultipartForm(maxMemory)
+		if err != nil && err != http.ErrNotMultipart {
+			if parseErr := r.ParseForm(); parseErr != nil {
+				// Log the error but continue
+				fmt.Fprintf(os.Stderr, "Error parsing form in traversal detector: %v\n", parseErr)
+			}
+		}
 	}
 
 	// Check query parameters
 	for key, values := range r.URL.Query() {
 		for _, value := range values {
-			if d.checkString(value) {
-				return true, &BlockReason{
+			decodedValue, _ := url.QueryUnescape(value)
+			if d.checkString(decodedValue) {
+				return true, &types.BlockReason{
 					Rule:    "path_traversal",
 					Message: "Path traversal detected in query parameter: " + key,
+				}
+			}
+			// Check raw value
+			if decodedValue != value && d.checkString(value) {
+				return true, &types.BlockReason{
+					Rule:    "path_traversal",
+					Message: "Path traversal detected in raw query parameter: " + key,
 				}
 			}
 		}
 	}
 
 	// Check form parameters
-	for key, values := range r.Form {
-		for _, value := range values {
-			if d.checkString(value) {
-				return true, &BlockReason{
-					Rule:    "path_traversal",
-					Message: "Path traversal detected in form parameter: " + key,
+	if r.Form != nil {
+		for key, values := range r.Form {
+			for _, value := range values {
+				if d.checkString(value) {
+					return true, &types.BlockReason{
+						Rule:    "path_traversal",
+						Message: "Path traversal detected in form parameter: " + key,
+					}
 				}
 			}
 		}
@@ -76,10 +104,20 @@ func (d *PathTraversalDetector) Match(r *http.Request) (bool, *BlockReason) {
 
 	for _, header := range headersToCheck {
 		value := r.Header.Get(header)
-		if value != "" && d.checkString(value) {
-			return true, &BlockReason{
-				Rule:    "path_traversal",
-				Message: "Path traversal detected in header: " + header,
+		if value != "" {
+			decodedValue, _ := url.QueryUnescape(value)
+			if d.checkString(decodedValue) {
+				return true, &types.BlockReason{
+					Rule:    "path_traversal",
+					Message: "Path traversal detected in header: " + header,
+				}
+			}
+			// Check raw value
+			if decodedValue != value && d.checkString(value) {
+				return true, &types.BlockReason{
+					Rule:    "path_traversal",
+					Message: "Path traversal detected in raw header: " + header,
+				}
 			}
 		}
 	}
@@ -178,19 +216,24 @@ func compilePathTraversalPatterns() []*regexp.Regexp {
 }
 
 // Detect checks if a request contains path traversal attempts
-func (d *PathTraversalDetector) Detect(r *http.Request) (bool, *waffle.BlockReason) {
+func (d *PathTraversalDetector) Detect(r *http.Request) (bool, *types.BlockReason) {
 	// Parse form data to check for path traversal in POST parameters
-	if err := r.ParseForm(); err != nil {
-		// If form parsing fails, continue with what we can check
-		_ = err // Prevent empty branch warning
+	const maxMemory = 32 << 20 // 32MB
+	contentType := r.Header.Get("Content-Type")
+	if (r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) &&
+		(strings.Contains(contentType, "application/x-www-form-urlencoded") || strings.Contains(contentType, "multipart/form-data")) {
+		err := r.ParseMultipartForm(maxMemory)
+		if err != nil && err != http.ErrNotMultipart {
+			if parseErr := r.ParseForm(); parseErr != nil {
+				// Log the error but continue
+				fmt.Fprintf(os.Stderr, "Error parsing form in traversal detector: %v\n", parseErr)
+			}
+		}
 	}
 
 	// Check URL path first (most common vector)
 	if matched, reason := d.Match(r); matched {
-		return true, &waffle.BlockReason{
-			Rule:    reason.Rule,
-			Message: reason.Message,
-		}
+		return matched, reason
 	}
 
 	return false, nil
